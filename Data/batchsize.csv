@@ -1,0 +1,7 @@
+{'BATCH_SIZE': -1, 'Open': '63.93', 'High': '64.31', 'Low': '63.56', 'Close': '64.13', 'Adj_Close': '63.87', 'Volume': '2493734.40'}
+{'BATCH_SIZE': 2048, 'Open': '160.33', 'High': '161.41', 'Low': '159.22', 'Close': '160.38', 'Adj_Close': '160.36', 'Volume': '6013587.84'}
+{'BATCH_SIZE': 1024, 'Open': '187.21', 'High': '188.60', 'Low': '185.70', 'Close': '187.20', 'Adj_Close': '187.20', 'Volume': '10847371.95'}
+{'BATCH_SIZE': 512, 'Open': '259.88', 'High': '261.48', 'Low': '257.62', 'Close': '259.62', 'Adj_Close': '259.62', 'Volume': '10305661.23'}
+{'BATCH_SIZE': 256, 'Open': '236.59', 'High': '238.01', 'Low': '234.52', 'Close': '236.32', 'Adj_Close': '236.32', 'Volume': '10388464.82'}
+{'BATCH_SIZE': 128, 'Open': '222.50', 'High': '223.82', 'Low': '220.54', 'Close': '222.23', 'Adj_Close': '222.23', 'Volume': '10278768.74'}
+{'BATCH_SIZE': 64, 'Open': '238.66', 'High': '240.21', 'Low': '236.19', 'Close': '238.14', 'Adj_Close': '238.14', 'Volume': '5228117.95'}
