@@ -161,3 +161,4 @@ cython_debug/
 
 OUTPUT/
 toy_exp/
+Checkpoints_*/
