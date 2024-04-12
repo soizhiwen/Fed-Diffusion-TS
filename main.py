@@ -5,7 +5,7 @@ import numpy as np
 
 from engine.logger import Logger
 from engine.solver import Trainer
-from Data.build_dataloader import build_dataloader, build_dataloader_cond
+from Data.build_dataloader import build_dataloader, build_dataloader_cond, build_dataloader_fed
 from Models.interpretable_diffusion.model_utils import unnormalize_to_zero_to_one
 from Utils.io_utils import load_yaml_config, seed_everything, merge_opts_to_config, instantiate_from_config
 
@@ -51,6 +51,7 @@ def parse_args():
 
     return args
 
+'''
 def main():
     args = parse_args()
 
@@ -91,6 +92,53 @@ def main():
         if dataset.auto_norm:
             samples = unnormalize_to_zero_to_one(samples)
             np.save(os.path.join(args.save_dir, f'ddpm_fake_{args.name}.npy'), samples)
+'''
+
+def main():
+    args = parse_args()
+
+    if args.seed is not None:
+        seed_everything(args.seed)
+
+    if args.gpu is not None:
+        torch.cuda.set_device(args.gpu)
+    
+    config = load_yaml_config(args.config_file)
+    config = merge_opts_to_config(config, args.opts)
+
+    logger = Logger(args)
+    logger.save_config(config)
+
+    model = instantiate_from_config(config['model']).cuda()
+    # for x in model.__dict__:
+    #     print(x)
+        
+    if args.sample == 1 and args.mode in ['infill', 'predict']:
+        test_dataloader_info = build_dataloader_cond(config, args)
+    dataloader_infos = build_dataloader_fed(config, 3, args)
+
+    for dataloader_info in dataloader_infos:
+        trainer = Trainer(config=config, args=args, model=model, dataloader=dataloader_info, logger=logger)
+
+        # if args.train:
+        #     trainer.train()
+        # elif args.sample == 1 and args.mode in ['infill', 'predict']:
+        #     trainer.load(args.milestone)
+        #     dataloader, dataset = test_dataloader_info['dataloader'], test_dataloader_info['dataset']
+        #     coef = config['dataloader']['test_dataset']['coefficient']
+        #     stepsize = config['dataloader']['test_dataset']['step_size']
+        #     sampling_steps = config['dataloader']['test_dataset']['sampling_steps']
+        #     samples, *_ = trainer.restore(dataloader, [dataset.window, dataset.var_num], coef, stepsize, sampling_steps)
+        #     if dataset.auto_norm:
+        #         samples = unnormalize_to_zero_to_one(samples)
+        #         np.save(os.path.join(args.save_dir, f'ddpm_{args.mode}_{args.name}.npy'), samples)
+        # else:
+        #     trainer.load(args.milestone)
+        #     dataset = dataloader_info['dataset']
+        #     samples = trainer.sample(num=len(dataset), size_every=2001, shape=[dataset.window, dataset.var_num])
+        #     if dataset.auto_norm:
+        #         samples = unnormalize_to_zero_to_one(samples)
+        #         np.save(os.path.join(args.save_dir, f'ddpm_fake_{args.name}.npy'), samples)
 
 if __name__ == '__main__':
     main()
