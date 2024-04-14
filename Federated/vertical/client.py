@@ -1,6 +1,5 @@
 import os
 import sys
-import pandas as pd
 import torch
 from torch import optim
 from sklearn.preprocessing import StandardScaler
