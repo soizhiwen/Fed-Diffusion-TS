@@ -60,8 +60,8 @@ def split(dataset, nr_clients: int, status: str, seed: int) -> List[Subset]:
 
     return [Subset(dataset, split) for split in cast(List[List[int]], splits)]
 
-labeled_dataset = data_label(file_path = 'Data/datasets/stock_data.csv', step_size = 1)
-sample_split = split(labeled_dataset, 5, 'non_iid', 42)
+labeled_dataset = data_label(file_path = 'Data/datasets/stock_data.csv', window_size = 96, step_size = 1)
+sample_split = split(labeled_dataset, 5, 'balance_label', 42)
 
 statistic, p_value = KS_test(sample_split)
 print(f'KS test - statistic: {statistic} - p_value: {p_value}')
