@@ -23,7 +23,7 @@ def apply_transforms(*, train_set, test_set, valid_set=None):
     train_set[:, 0] = np.split(X_train, len(train_set))
     test_set[:, 0] = np.split(X_test, len(test_set))
 
-    if valid_set:
+    if valid_set is not None:
         X_valid = np.concatenate(valid_set[:, 0])
         X_valid = scaler.transform(X_valid)
         valid_set[:, 0] = np.split(X_valid, len(valid_set))
@@ -126,6 +126,7 @@ def train(
     device,
     steps=None,
 ):
+    print("Start training...")
     model.train()
     for _ in tqdm(range(n_epochs), desc="Training"):
         for features, labels in train_loader:
@@ -149,6 +150,7 @@ def train(
 
 
 def test(model, test_loader, loss_fn, device, steps=None):
+    print("Start evalutation...")
     test_loss = 0.0
     n_correct = 0
     model.eval()

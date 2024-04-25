@@ -69,7 +69,7 @@ def main():
     2. server-side parameter evaluation
     """
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    model = Net()
+    model = Net().to(device)
     model_parameters = [val.cpu().numpy() for _, val in model.state_dict().items()]
     loss_fn = torch.nn.CrossEntropyLoss()
 
@@ -79,7 +79,7 @@ def main():
         fraction_evaluate=1.0,
         min_fit_clients=2,
         min_evaluate_clients=2,
-        min_available_clients=10,
+        min_available_clients=2,
         evaluate_fn=get_evaluate_fn(model, loss_fn, device),
         on_fit_config_fn=fit_config,
         on_evaluate_config_fn=evaluate_config,
@@ -88,8 +88,8 @@ def main():
 
     # Start Flower server for four rounds of federated learning
     fl.server.start_server(
-        server_address="0.0.0.0:8080",
-        config=fl.server.ServerConfig(num_rounds=4),
+        server_address="localhost:2424",
+        config=fl.server.ServerConfig(num_rounds=100),
         strategy=strategy,
     )
 

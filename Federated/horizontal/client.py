@@ -28,11 +28,11 @@ class FlowerClient(fl.client.NumPyClient):
         self.valid_set = valid_set
         self.test_set = test_set
         self.device = device
-        self.model = model.to(device)
+        self.model = model
         self.optimizer = optimizer
         self.loss_fn = loss_fn
 
-    def get_parameters(self, config):
+    def get_parameters(self):
         return [val.cpu().numpy() for _, val in self.model.state_dict().items()]
 
     def set_parameters(self, parameters):
@@ -97,7 +97,6 @@ def main() -> None:
         "--num-clients",
         type=int,
         default=1,
-        choices=range(0, 10),
         required=False,
         help="Specifies the artificial data partition of CIFAR10 to be used. \
         Picks partition 0 by default",
@@ -106,7 +105,6 @@ def main() -> None:
         "--client-id",
         type=int,
         default=0,
-        choices=range(0, 10),
         required=False,
         help="Specifies the artificial data partition of CIFAR10 to be used. \
         Picks partition 0 by default",
@@ -127,7 +125,7 @@ def main() -> None:
     )
 
     # Start Flower client
-    model = Net()
+    model = Net().to(device)
     optimizer = torch.optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
     loss_fn = torch.nn.CrossEntropyLoss()
 
@@ -140,7 +138,7 @@ def main() -> None:
         optimizer=optimizer,
         loss_fn=loss_fn,
     ).to_client()
-    fl.client.start_client(server_address="127.0.0.1:8080", client=client)
+    fl.client.start_client(server_address="localhost:2424", client=client)
 
 
 if __name__ == "__main__":
