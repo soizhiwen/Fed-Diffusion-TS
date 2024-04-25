@@ -23,4 +23,5 @@ if __name__ == "__main__":
         n_clusters=5,
         step_size=1,
     )
+    dataset = np.array(dataset, dtype=object)
     np.save("../../Data/datasets/labeled_stock_data.npy", dataset)
