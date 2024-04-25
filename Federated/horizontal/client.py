@@ -114,7 +114,6 @@ def main() -> None:
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    # Load a subset of CIFAR-10 to simulate the local data partition
     train_set, valid_set, test_set = load_partition(
         "../../Data/datasets/labeled_stock_data.npy",
         args.client_id,
