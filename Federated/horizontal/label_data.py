@@ -18,7 +18,7 @@ def label_data(path, window_size=24, n_clusters=5, step_size=1):
 
 if __name__ == "__main__":
     dataset = label_data(
-        file_path="../../Data/datasets/stock_data.csv",
+        path="../../Data/datasets/stock_data.csv",
         window_size=24,
         n_clusters=5,
         step_size=1,
