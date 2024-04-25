@@ -63,6 +63,15 @@ def get_evaluate_fn(model, loss_fn, device):
     return evaluate
 
 
+def weighted_average(metrics):
+    # Multiply accuracy of each client by number of examples used
+    accuracies = [num_examples * m["accuracy"] for num_examples, m in metrics]
+    examples = [num_examples for num_examples, _ in metrics]
+
+    # Aggregate and return custom metric (weighted average)
+    return {"accuracy": sum(accuracies) / sum(examples)}
+
+
 def main():
     """Load model for
     1. server-side parameter initialization
@@ -81,6 +90,7 @@ def main():
         min_evaluate_clients=2,
         min_available_clients=2,
         evaluate_fn=get_evaluate_fn(model, loss_fn, device),
+        evaluate_metrics_aggregation_fn=weighted_average,
         on_fit_config_fn=fit_config,
         on_evaluate_config_fn=evaluate_config,
         initial_parameters=fl.common.ndarrays_to_parameters(model_parameters),
