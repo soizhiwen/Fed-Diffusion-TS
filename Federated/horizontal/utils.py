@@ -126,7 +126,6 @@ def train(
     device,
     steps=None,
 ):
-    print("Start training...")
     model.train()
     for _ in tqdm(range(n_epochs), desc="Training"):
         for features, labels in train_loader:
@@ -150,12 +149,11 @@ def train(
 
 
 def test(model, test_loader, loss_fn, device, steps=None):
-    print("Start evalutation...")
     test_loss = 0.0
     n_correct = 0
     model.eval()
     with torch.no_grad():
-        for idx, (features, labels) in enumerate(test_loader):
+        for idx, (features, labels) in enumerate(tqdm(test_loader, desc="Evaluating")):
             features = features.to(device)
             labels = labels.to(device)
             outputs = model(features)

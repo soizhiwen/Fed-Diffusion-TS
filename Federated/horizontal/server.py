@@ -6,7 +6,7 @@ from collections import OrderedDict
 from torch.utils.data import DataLoader
 
 from model import Net
-from custom_dataset import CustomDataset
+from dataset import CustomDataset
 from utils import load_centralized_data, test
 
 warnings.filterwarnings("ignore")
