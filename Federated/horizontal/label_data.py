@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from sklearn.cluster import KMeans
+from sklearn.preprocessing import MinMaxScaler
 
 
 def label_data(path, window_size=24, n_clusters=5, step_size=1):
@@ -10,6 +11,7 @@ def label_data(path, window_size=24, n_clusters=5, step_size=1):
         for i in range(0, len(data) - window_size + 1, step_size)
     ]
     flattened_subsets = [np.array(subset).flatten() for subset in subsets]
+    flattened_subsets = MinMaxScaler().fit_transform(flattened_subsets)
     kmeans_models = KMeans(n_clusters=n_clusters).fit(flattened_subsets)
     labels = kmeans_models.labels_
     labeled_dataset = [[subsets[i], labels[i]] for i in range(len(subsets))]
