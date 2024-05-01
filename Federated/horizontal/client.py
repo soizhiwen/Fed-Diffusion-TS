@@ -1,36 +1,26 @@
+import os
 import warnings
 import argparse
 import torch
 import flwr as fl
+import numpy as np
 from collections import OrderedDict
-from torch.utils.data import DataLoader
 
-from model import Net
-from dataset import CustomDataset
-from utils import load_partition, train, test
+from utils import load_partition, cal_context_fid, cal_cross_correl_loss
+
+from engine.solver import Trainer
+from Data.build_dataloader import build_dataloader_fed
+from Models.interpretable_diffusion.model_utils import unnormalize_to_zero_to_one
+from Utils.io_utils import load_yaml_config, instantiate_from_config
+
 
 warnings.filterwarnings("ignore")
 
 
 class FlowerClient(fl.client.NumPyClient):
-    def __init__(
-        self,
-        *,
-        train_set,
-        valid_set,
-        test_set,
-        device,
-        model,
-        optimizer,
-        loss_fn,
-    ):
-        self.train_set = train_set
-        self.valid_set = valid_set
-        self.test_set = test_set
-        self.device = device
-        self.model = model
-        self.optimizer = optimizer
-        self.loss_fn = loss_fn
+    def __init__(self, trainer):
+        self.trainer = trainer
+        self.model = trainer.model
 
     def get_parameters(self):
         return [val.cpu().numpy() for _, val in self.model.state_dict().items()]
@@ -45,29 +35,12 @@ class FlowerClient(fl.client.NumPyClient):
         self.set_parameters(parameters)
 
         # Get hyperparameters for this round
-        batch_size = config["batch_size"]
-        epochs = config["local_epochs"]
-
-        train_dataset = CustomDataset(self.train_set)
-        valid_dataset = CustomDataset(self.valid_set)
-
-        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-        valid_loader = DataLoader(valid_dataset, batch_size=batch_size)
-
-        results = train(
-            self.model,
-            train_loader,
-            valid_loader,
-            self.optimizer,
-            self.loss_fn,
-            epochs,
-            self.device,
-        )
+        self.trainer.train_num_steps = config["local_epochs"]
+        self.trainer.train()
 
         parameters_prime = self.get_parameters()
-        num_examples_train = len(train_dataset)
 
-        return parameters_prime, num_examples_train, results
+        return parameters_prime, 1, {}
 
     def evaluate(self, parameters, config):
         """Evaluate parameters on the locally held test set."""
@@ -75,68 +48,86 @@ class FlowerClient(fl.client.NumPyClient):
         self.set_parameters(parameters)
 
         # Get config values
-        steps = config["valid_steps"]
+        size_every = config["size_every"]
+        metric_iterations = config["metric_iterations"]
 
-        # Evaluate global model parameters on the local test data and return results
-        test_dataset = CustomDataset(self.test_set)
-        test_loader = DataLoader(test_dataset, batch_size=16)
-
-        loss, accuracy = test(
-            self.model,
-            test_loader,
-            self.loss_fn,
-            self.device,
-            steps,
+        dataset = self.trainer.dataloader_info["dataset"]
+        seq_length, feature_dim = dataset.window, dataset.var_num
+        ori_data = np.load(
+            os.path.join(
+                dataset.dir, f"{dataset.name}_norm_truth_{seq_length}_train.npy"
+            )
         )
-        return float(loss), len(test_dataset), {"accuracy": float(accuracy)}
+        fake_data = self.trainer.sample(
+            num=len(dataset), size_every=size_every, shape=[seq_length, feature_dim]
+        )
+        if dataset.auto_norm:
+            fake_data = unnormalize_to_zero_to_one(fake_data)
+            np.save(
+                os.path.join(
+                    self.trainer.args.save_dir, f"ddpm_fake_{dataset.name}.npy"
+                ),
+                fake_data,
+            )
+
+        ctx_fid_mean, ctx_fid_sigma = cal_context_fid(
+            ori_data, fake_data, iterations=metric_iterations
+        )
+        corr_loss_mean, corr_loss_sigma = cal_cross_correl_loss(
+            ori_data, fake_data, iterations=metric_iterations
+        )
+
+        return 0.0, 1, {}
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Flower")
     parser.add_argument(
-        "--num-clients",
+        "--num_clients",
         type=int,
         default=1,
-        required=False,
-        help="Specifies the artificial data partition of CIFAR10 to be used. \
-        Picks partition 0 by default",
+        help="Specifies the artificial data partition.",
     )
     parser.add_argument(
-        "--client-id",
+        "--client_id",
         type=int,
         default=0,
-        required=False,
-        help="Specifies the artificial data partition of CIFAR10 to be used. \
-        Picks partition 0 by default",
+        help="Select client ID to rufn",
+    )
+    parser.add_argument("--name", type=str, default=None)
+    parser.add_argument(
+        "--config_file",
+        type=str,
+        default=None,
+        help="path of config file",
+    )
+    parser.add_argument(
+        "--output",
+        type=str,
+        default="./OUTPUT",
+        help="directory to save the results",
     )
 
     args = parser.parse_args()
+    args.save_dir = os.path.join(args.output, f"{args.name}")
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    os.makedirs(args.save_dir, exist_ok=True)
+    config = load_yaml_config(args.config_file)
 
-    train_set, valid_set, test_set = load_partition(
+    dataset = load_partition(
         "../../Data/datasets/labeled_stock_data.npy",
         args.client_id,
         nr_clients=args.num_clients,
         split_type="balance_label",
-        valid_size=0.1,
-        test_size=0.2,
     )
 
-    # Start Flower client
-    model = Net().to(device)
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
-    loss_fn = torch.nn.CrossEntropyLoss()
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    model = instantiate_from_config(config["model"]).to(device)
+    dataloader_info = build_dataloader_fed(config, dataset, args)
+    trainer = Trainer(config=config, args=args, model=model, dataloader=dataloader_info)
 
-    client = FlowerClient(
-        train_set=train_set,
-        valid_set=valid_set,
-        test_set=test_set,
-        device=device,
-        model=model,
-        optimizer=optimizer,
-        loss_fn=loss_fn,
-    ).to_client()
+    # Start Flower client
+    client = FlowerClient(trainer=trainer).to_client()
     fl.client.start_client(server_address="localhost:2424", client=client)
 
 

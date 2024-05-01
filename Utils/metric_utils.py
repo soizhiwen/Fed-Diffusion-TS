@@ -14,6 +14,7 @@ def display_scores(results):
    sigma = sigma * scipy.stats.t.ppf((1 + 0.95) / 2., 5-1)
   #  sigma = 1.96*(np.std(results)/np.sqrt(len(results)))
    print('Final Score: ', f'{mean} \xB1 {sigma}')
+   return mean, sigma
 
 
 def train_test_divide (data_x, data_x_hat, data_t, data_t_hat, train_rate=0.8):

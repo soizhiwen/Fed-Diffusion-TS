@@ -2,14 +2,16 @@
 set -e
 cd "$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"/
 
-python server.py &
+python server.py --config_file ../../Config/stocks_hfl.yaml  &
 sleep 1  # Sleep for 1s to allow the server to start
 
-num_clients=5
+num_clients=3
+name="exp_1"
+config="../../Config/stocks_hfl.yaml"
 
 for i in `seq 0 "$((num_clients - 1))"`; do
     echo "Starting client $i"
-    python client.py --num-clients=${num_clients} --client-id=${i} &
+    python client.py --name $name --num_clients $num_clients --client_id $i --config_file $config &
 done
 
 # Enable CTRL+C to stop all background processes

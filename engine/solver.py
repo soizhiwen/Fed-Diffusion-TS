@@ -28,6 +28,7 @@ class Trainer(object):
         self.train_num_steps = config['solver']['max_epochs']
         self.gradient_accumulate_every = config['solver']['gradient_accumulate_every']
         self.save_cycle = config['solver']['save_cycle']
+        self.dataloader_info = dataloader
         self.dl = cycle(dataloader['dataloader'])
         self.step = 0
         self.milestone = 0

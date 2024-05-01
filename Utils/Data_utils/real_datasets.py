@@ -14,7 +14,8 @@ class CustomDataset(Dataset):
     def __init__(
         self, 
         name,
-        data_root, 
+        data_root=None, 
+        dataset=None,
         window=64, 
         proportion=0.8, 
         save2npy=True, 
@@ -34,7 +35,13 @@ class CustomDataset(Dataset):
             assert ~(predict_length is not None or missing_ratio is not None), ''
         self.name, self.pred_len, self.missing_ratio = name, predict_length, missing_ratio
         self.style, self.distribution, self.mean_mask_length = style, distribution, mean_mask_length
-        self.rawdata, self.scaler = self.read_data(data_root, self.name)
+        self.data_root, self.dataset = data_root, dataset
+        if self.data_root is not None:
+            self.rawdata, self.scaler = self.read_data(self.data_root, self.name)
+        elif self.dataset is not None:
+            self.rawdata, self.scaler = self.fit_data(self.dataset)
+        else:
+            raise NotImplementedError()
         self.dir = os.path.join(output_dir, 'samples')
         os.makedirs(self.dir, exist_ok=True)
 
@@ -60,11 +67,18 @@ class CustomDataset(Dataset):
         self.sample_num = self.samples.shape[0]
 
     def __getsamples(self, data, proportion, seed):
-        x = np.zeros((self.sample_num_total, self.window, self.var_num))
-        for i in range(self.sample_num_total):
-            start = i
-            end = i + self.window
-            x[i, :, :] = data[start:end, :]
+        if self.data_root is not None:
+            x = np.zeros((self.sample_num_total, self.window, self.var_num))
+            for i in range(self.sample_num_total):
+                start = i
+                end = i + self.window
+                x[i, :, :] = data[start:end, :]
+        elif self.dataset is not None:
+            len_data = len(self.dataset) // self.window
+            x = np.split(data, len_data)
+            x = np.array(x)
+        else:
+            raise NotImplementedError()
 
         train_data, test_data = self.divide(x, proportion, seed)
 
@@ -133,6 +147,14 @@ class CustomDataset(Dataset):
         if name == 'etth':
             df.drop(df.columns[0], axis=1, inplace=True)
         data = df.values
+        scaler = MinMaxScaler()
+        scaler = scaler.fit(data)
+        return data, scaler
+    
+    @staticmethod
+    def fit_data(data):
+        """Transform data to MinMaxScaler
+        """
         scaler = MinMaxScaler()
         scaler = scaler.fit(data)
         return data, scaler

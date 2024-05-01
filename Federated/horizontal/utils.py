@@ -1,35 +1,15 @@
-import warnings
+import sys
 import torch
 import numpy as np
 import numpy.random as npr
 from typing import List, cast
-from tqdm import tqdm
 from torch.utils.data import Subset
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.model_selection import train_test_split
 
-warnings.filterwarnings("ignore")
+sys.path.append("../../")
 
-
-def apply_transforms(*, train_set, test_set, valid_set=None):
-    """Apply transforms to the partition from FederatedDataset."""
-    X_train = np.concatenate(train_set[:, 0])
-    X_test = np.concatenate(test_set[:, 0])
-
-    scaler = MinMaxScaler().fit(X_train)
-    X_train = scaler.transform(X_train)
-    X_test = scaler.transform(X_test)
-
-    train_set[:, 0] = np.split(X_train, len(train_set))
-    test_set[:, 0] = np.split(X_test, len(test_set))
-
-    if valid_set is not None:
-        X_valid = np.concatenate(valid_set[:, 0])
-        X_valid = scaler.transform(X_valid)
-        valid_set[:, 0] = np.split(X_valid, len(valid_set))
-        return train_set, valid_set, test_set
-
-    return train_set, test_set
+from Utils.context_fid import Context_FID
+from Utils.metric_utils import display_scores
+from Utils.cross_correlation import CrossCorrelLoss
 
 
 def partition(dataset, nr_clients: int, split_type: str, seed: int) -> List[Subset]:
@@ -74,95 +54,49 @@ def load_partition(
     partition_id,
     nr_clients=5,
     split_type="balance_label",
-    valid_size=0.1,
-    test_size=0.2,
     seed=42,
 ):
     ds = np.load(path, allow_pickle=True)
     part_ds = partition(ds, nr_clients, split_type, seed)[partition_id]
-    train_set, test_set = train_test_split(
-        part_ds,
-        test_size=test_size,
-        random_state=seed,
-    )
-    train_set, valid_set = train_test_split(
-        train_set,
-        test_size=valid_size,
-        random_state=seed,
-    )
-
-    train_set, valid_set, test_set = apply_transforms(
-        train_set=train_set,
-        test_set=test_set,
-        valid_set=valid_set,
-    )
-
-    return train_set, valid_set, test_set
+    part_ds = np.concatenate(part_ds[:, 0])
+    return part_ds
 
 
-def load_centralized_data(path, test_size=0.2, seed=42):
+def load_centralized_data(path):
     ds = np.load(path, allow_pickle=True)
-    train_set, test_set = train_test_split(
-        ds,
-        test_size=test_size,
-        random_state=seed,
-    )
-
-    _, test_set = apply_transforms(
-        train_set=train_set,
-        test_set=test_set,
-    )
-
-    return test_set
+    ds = np.concatenate(ds[:, 0])
+    return ds
 
 
-def train(
-    model,
-    train_loader,
-    valid_loader,
-    optimizer,
-    loss_fn,
-    n_epochs,
-    device,
-    steps=None,
-):
-    model.train()
-    for _ in tqdm(range(n_epochs), desc="Training"):
-        for features, labels in train_loader:
-            features = features.to(device)
-            labels = labels.to(device)
-            optimizer.zero_grad()
-            outputs = model(features)
-            loss = loss_fn(outputs, labels)
-            loss.backward()
-            optimizer.step()
+def cal_context_fid(ori_data, fake_data, iterations=5):
+    context_fid_score = []
+    for i in range(iterations):
+        context_fid = Context_FID(ori_data[:], fake_data[: ori_data.shape[0]])
+        context_fid_score.append(context_fid)
+        print(f"Iter {i}: Context-FID={context_fid}")
 
-    train_loss, train_accuracy = test(model, train_loader, loss_fn, device, steps)
-    valid_loss, valid_accuracy = test(model, valid_loader, loss_fn, device, steps)
-
-    return {
-        "train_loss": train_loss,
-        "train_accuracy": train_accuracy,
-        "valid_loss": valid_loss,
-        "valid_accuracy": valid_accuracy,
-    }
+    mean, sigma = display_scores(context_fid_score)
+    return mean, sigma
 
 
-def test(model, test_loader, loss_fn, device, steps=None):
-    test_loss = 0.0
-    n_correct = 0
-    model.eval()
-    with torch.no_grad():
-        for idx, (features, labels) in enumerate(tqdm(test_loader, desc="Evaluating")):
-            features = features.to(device)
-            labels = labels.to(device)
-            outputs = model(features)
-            loss = loss_fn(outputs, labels)
-            test_loss += loss.item()
-            n_correct += torch.sum(outputs.argmax(1) == labels).item()
-            if steps is not None and idx == steps:
-                break
+def cal_cross_correl_loss(ori_data, fake_data, iterations=5):
+    def random_choice(size, num_select=100):
+        select_idx = np.random.randint(low=0, high=size, size=(num_select,))
+        return select_idx
 
-    loss = test_loss / len(test_loader)
-    accuracy = n_correct / len(test_loader.dataset)
-    return loss, accuracy
+    x_real = torch.from_numpy(ori_data)
+    x_fake = torch.from_numpy(fake_data)
+
+    correlational_score = []
+    size = int(x_real.shape[0] / iterations)
+
+    for i in range(iterations):
+        real_idx = random_choice(x_real.shape[0], size)
+        fake_idx = random_choice(x_fake.shape[0], size)
+        corr = CrossCorrelLoss(x_real[real_idx, :, :], name="CrossCorrelLoss")
+        loss = corr.compute(x_fake[fake_idx, :, :])
+        correlational_score.append(loss.item())
+        print(f"Iter {i}: Cross-Correlation Loss={loss.item()}")
+
+    mean, sigma = display_scores(correlational_score)
+    return mean, sigma
