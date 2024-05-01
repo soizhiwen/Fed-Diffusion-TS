@@ -45,6 +45,7 @@ dataloader:
     params:
       name: stock
       proportion: 1.0  # Set to rate < 1 if training conditional generation
+      data_root: ../../Data/datasets/labeled_stock_data.npy
       window: 24  # seq_length
       save2npy: True
       neg_one_to_one: True

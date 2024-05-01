@@ -116,7 +116,7 @@ def main() -> None:
     config = load_yaml_config(args.config_file)
 
     dataset = load_partition(
-        "../../Data/datasets/labeled_stock_data.npy",
+        config['dataloader']['train_dataset']['params']['data_root'],
         args.client_id,
         nr_clients=args.num_clients,
         split_type="balance_label",

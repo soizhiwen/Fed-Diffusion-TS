@@ -36,10 +36,10 @@ class CustomDataset(Dataset):
         self.name, self.pred_len, self.missing_ratio = name, predict_length, missing_ratio
         self.style, self.distribution, self.mean_mask_length = style, distribution, mean_mask_length
         self.data_root, self.dataset = data_root, dataset
-        if self.data_root is not None:
-            self.rawdata, self.scaler = self.read_data(self.data_root, self.name)
-        elif self.dataset is not None:
+        if self.dataset is not None:
             self.rawdata, self.scaler = self.fit_data(self.dataset)
+        elif self.data_root is not None:
+            self.rawdata, self.scaler = self.read_data(self.data_root, self.name)
         else:
             raise NotImplementedError()
         self.dir = os.path.join(output_dir, 'samples')
@@ -67,16 +67,16 @@ class CustomDataset(Dataset):
         self.sample_num = self.samples.shape[0]
 
     def __getsamples(self, data, proportion, seed):
-        if self.data_root is not None:
+        if self.dataset is not None:
+            len_data = len(self.dataset) // self.window
+            x = np.split(data, len_data)
+            x = np.array(x)
+        elif self.data_root is not None:
             x = np.zeros((self.sample_num_total, self.window, self.var_num))
             for i in range(self.sample_num_total):
                 start = i
                 end = i + self.window
                 x[i, :, :] = data[start:end, :]
-        elif self.dataset is not None:
-            len_data = len(self.dataset) // self.window
-            x = np.split(data, len_data)
-            x = np.array(x)
         else:
             raise NotImplementedError()
 
