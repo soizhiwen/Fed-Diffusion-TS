@@ -58,13 +58,13 @@ def evaluate_config(server_round: int):
 #     return evaluate
 
 
-# def weighted_average(metrics):
-#     # Multiply accuracy of each client by number of examples used
-#     accuracies = [num_examples * m["accuracy"] for num_examples, m in metrics]
-#     examples = [num_examples for num_examples, _ in metrics]
+def evaluate_weighted_average(metrics):
+    # Multiply context fid of each client by number of examples used
+    context_fids = [num_examples * m["context_fid"] for num_examples, m in metrics]
+    examples = [num_examples for num_examples, _ in metrics]
 
-#     # Aggregate and return custom metric (weighted average)
-#     return {"accuracy": sum(accuracies) / sum(examples)}
+    # Aggregate and return custom metric (weighted average)
+    return {"context_fid": sum(context_fids) / sum(examples)}
 
 
 def main():
@@ -98,7 +98,7 @@ def main():
         on_evaluate_config_fn=evaluate_config,
         initial_parameters=fl.common.ndarrays_to_parameters(model_parameters),
         # fit_metrics_aggregation_fn=,
-        # evaluate_metrics_aggregation_fn=weighted_average,
+        evaluate_metrics_aggregation_fn=evaluate_weighted_average,
     )
 
     # Start Flower server for four rounds of federated learning

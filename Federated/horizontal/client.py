@@ -39,8 +39,9 @@ class FlowerClient(fl.client.NumPyClient):
         self.trainer.train()
 
         parameters_prime = self.get_parameters()
+        dataset = self.trainer.dataloader_info["dataset"]
 
-        return parameters_prime, 1, {}
+        return parameters_prime, len(dataset), {}
 
     def evaluate(self, parameters, config):
         """Evaluate parameters on the locally held test set."""
@@ -70,14 +71,14 @@ class FlowerClient(fl.client.NumPyClient):
                 fake_data,
             )
 
-        ctx_fid_mean, ctx_fid_sigma = cal_context_fid(
+        ctx_fid_mean, _ = cal_context_fid(
             ori_data, fake_data, iterations=metric_iterations
         )
-        corr_loss_mean, corr_loss_sigma = cal_cross_correl_loss(
+        corr_loss_mean, _ = cal_cross_correl_loss(
             ori_data, fake_data, iterations=metric_iterations
         )
 
-        return 0.0, 1, {}
+        return float(corr_loss_mean), len(dataset), {"context_fid": float(ctx_fid_mean)}
 
 
 def main() -> None:
