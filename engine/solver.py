@@ -82,7 +82,7 @@ class Trainer(object):
             tic = time.time()
             self.logger.log_info('{}: start training...'.format(self.args.name), check_primary=False)
 
-        with tqdm(initial=step, total=self.train_num_steps) as pbar:
+        with tqdm(initial=step, total=self.train_num_steps, disable=True) as pbar:
             while step < self.train_num_steps:
                 total_loss = 0.
                 for _ in range(self.gradient_accumulate_every):

@@ -179,7 +179,7 @@ class Diffusion_TS(nn.Module):
     def sample(self, shape):
         device = self.betas.device
         img = torch.randn(shape, device=device)
-        for t in tqdm(reversed(range(0, self.num_timesteps)),
+        for t in tqdm(reversed(range(0, self.num_timesteps), disable=True),
                       desc='sampling loop time step', total=self.num_timesteps):
             img, _ = self.p_sample(img, t)
         return img

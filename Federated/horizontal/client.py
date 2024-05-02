@@ -11,7 +11,7 @@ import flwr as fl
 import numpy as np
 from collections import OrderedDict
 
-from utils import load_partition, cal_context_fid, cal_cross_correl_loss
+from Federated.horizontal.utils import load_partition, cal_context_fid, cal_cross_correl_loss
 
 from engine.solver import Trainer
 from Data.build_dataloader import build_dataloader_fed
@@ -23,7 +23,7 @@ class FlowerClient(fl.client.NumPyClient):
     def __init__(self, trainer: Trainer):
         self.trainer = trainer
         self.model = trainer.model
-        self.client_id = trainer.args.client_id
+        # self.client_id = trainer.args.client_id
 
     def get_parameters(self):
         return [val.cpu().numpy() for _, val in self.model.state_dict().items()]
@@ -44,7 +44,7 @@ class FlowerClient(fl.client.NumPyClient):
         parameters_prime = self.get_parameters()
         dataset = self.trainer.dataloader_info["dataset"]
 
-        results = {"client_id": self.client_id}
+        results = {}
 
         return parameters_prime, len(dataset), results
 
@@ -84,6 +84,39 @@ class FlowerClient(fl.client.NumPyClient):
         )
 
         return float(corr_loss_mean), len(dataset), {"context_fid": float(ctx_fid_mean)}
+
+
+def get_client_fn(config, args, model):
+    """Return a function to construct a client.
+
+    The VirtualClientEngine will execute this function whenever a client is sampled by
+    the strategy to participate.
+    """
+
+    def client_fn(cid: str) -> fl.client.Client:
+        """Construct a FlowerClient with its own dataset partition."""
+
+        args.client_id = int(cid)
+        # Let's get the partition corresponding to the i-th client
+        dataset = load_partition(
+            config["dataloader"]["train_dataset"]["params"]["data_root"],
+            args.client_id,
+            nr_clients=args.num_clients,
+            split_type="balance_label",
+        )
+        
+        dataloader_info = build_dataloader_fed(config, dataset, args)
+        trainer = Trainer(
+            config=config,
+            args=args,
+            model=model,
+            dataloader=dataloader_info,
+        )
+
+        # Create and return client
+        return FlowerClient(trainer=trainer).to_client()
+
+    return client_fn
 
 
 def main() -> None:
