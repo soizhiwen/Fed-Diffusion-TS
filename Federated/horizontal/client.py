@@ -125,8 +125,6 @@ def main() -> None:
         args.client_id,
         nr_clients=args.num_clients,
         split_type="balance_label",
-        # valid_size=0.1,
-        # test_size=0.2,
     )
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
