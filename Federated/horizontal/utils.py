@@ -1,11 +1,8 @@
-import sys
 import torch
 import numpy as np
 import numpy.random as npr
 from typing import List, cast
 from torch.utils.data import Subset
-
-sys.path.append("../../")
 
 from Utils.context_fid import Context_FID
 from Utils.metric_utils import display_scores

@@ -1,5 +1,10 @@
-import os
+import sys
 import warnings
+
+sys.path.append("../../")
+warnings.filterwarnings("ignore")
+
+import os
 import argparse
 import torch
 import flwr as fl
@@ -12,9 +17,6 @@ from engine.solver import Trainer
 from Data.build_dataloader import build_dataloader_fed
 from Models.interpretable_diffusion.model_utils import unnormalize_to_zero_to_one
 from Utils.io_utils import load_yaml_config, instantiate_from_config
-
-
-warnings.filterwarnings("ignore")
 
 
 class FlowerClient(fl.client.NumPyClient):
@@ -116,7 +118,7 @@ def main() -> None:
     config = load_yaml_config(args.config_file)
 
     dataset = load_partition(
-        config['dataloader']['train_dataset']['params']['data_root'],
+        config["dataloader"]["train_dataset"]["params"]["data_root"],
         args.client_id,
         nr_clients=args.num_clients,
         split_type="balance_label",

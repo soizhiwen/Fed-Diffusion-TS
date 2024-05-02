@@ -2,7 +2,7 @@
 set -e
 cd "$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"/
 
-python server.py --config_file ../../Config/stocks_hfl.yaml  &
+python server.py --config_file ../../Config/stocks_hfl.yaml --fedavg &
 sleep 1  # Sleep for 1s to allow the server to start
 
 num_clients=3
