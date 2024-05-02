@@ -52,7 +52,7 @@ def partition(dataset, nr_clients: int, split_type: str, seed: int) -> List[Subs
             np.concatenate([shards[i] for i in inds], dtype=np.int64)
             for inds in shuffled_shard_indices.reshape(-1, 2)
         ]
-
+    
     elif split_type == "order":
         splits = np.array_split(np.arange(len(dataset)), nr_clients)
 
