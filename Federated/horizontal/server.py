@@ -42,7 +42,11 @@ def main():
     # Start Flower server for four rounds of federated learning
     fl.server.start_server(
         server_address="localhost:2424",
+<<<<<<< Updated upstream
         config=fl.server.ServerConfig(num_rounds=6),
+=======
+        config=fl.server.ServerConfig(num_rounds=300),
+>>>>>>> Stashed changes
         strategy=strategy,
     )
 
