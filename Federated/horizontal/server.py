@@ -9,6 +9,7 @@ import torch
 import flwr as fl
 
 from fedavg import get_fedavg_fn
+from fedmultiavg import get_fedmultiavg_fn
 
 from Utils.io_utils import load_yaml_config, instantiate_from_config
 
@@ -25,7 +26,7 @@ def main():
         default=None,
         help="path of config file",
     )
-    parser.add_argument("--fedavg", action="store_true", help="use FedAvg strategy")
+    parser.add_argument("--multi_avg", action="store_true", help="use FedAvg strategy")
     args = parser.parse_args()
 
     config = load_yaml_config(args.config_file)
@@ -33,10 +34,10 @@ def main():
     model = instantiate_from_config(config["model"]).to(device)
     model_parameters = [val.cpu().numpy() for _, val in model.state_dict().items()]
 
-    if args.fedavg:
-        strategy = get_fedavg_fn(model_parameters)
+    if args.multi_avg:
+        strategy = get_fedmultiavg_fn(model_parameters)
     else:
-        raise NotImplementedError("Only FedAvg strategy is supported")
+        strategy = get_fedavg_fn(model_parameters)
 
     # Start Flower server for four rounds of federated learning
     fl.server.start_server(
