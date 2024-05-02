@@ -10,6 +10,7 @@ import flwr as fl
 
 from fedavg import get_fedavg_fn
 from fedmultiavg import get_fedmultiavg_fn
+from utils import random_cluster_clients
 
 from Utils.io_utils import load_yaml_config, instantiate_from_config
 
@@ -20,6 +21,18 @@ def main():
     2. server-side parameter evaluation
     """
     parser = argparse.ArgumentParser(description="Flower")
+    parser.add_argument(
+        "--num_clients",
+        type=int,
+        default=1,
+        help="Specifies the artificial data partition.",
+    )
+    parser.add_argument(
+        "--num_clusters",
+        type=int,
+        default=1,
+        help="Specifies number of clusters for clients.",
+    )
     parser.add_argument(
         "--config_file",
         type=str,
@@ -35,14 +48,15 @@ def main():
     model_parameters = [val.cpu().numpy() for _, val in model.state_dict().items()]
 
     if args.multi_avg:
-        strategy = get_fedmultiavg_fn(model_parameters)
+        client_clusters = random_cluster_clients(args.num_clients, args.num_clusters)
+        strategy = get_fedmultiavg_fn(model_parameters, client_clusters)
     else:
         strategy = get_fedavg_fn(model_parameters)
 
     # Start Flower server for four rounds of federated learning
     fl.server.start_server(
         server_address="localhost:2424",
-        config=fl.server.ServerConfig(num_rounds=6),
+        config=fl.server.ServerConfig(num_rounds=2),
         strategy=strategy,
     )
 

@@ -36,6 +36,7 @@ than or equal to the values of `min_fit_clients` and `min_evaluate_clients`.
 class FedMultiAvg(Strategy):
     def __init__(
         self,
+        client_clusters: List[List[int]],
         *,
         fraction_fit: float = 1.0,
         fraction_evaluate: float = 1.0,
@@ -64,6 +65,7 @@ class FedMultiAvg(Strategy):
         ):
             log(WARNING, WARNING_MIN_AVAILABLE_CLIENTS_TOO_LOW)
 
+        self.client_clusters = client_clusters
         self.fraction_fit = fraction_fit
         self.fraction_evaluate = fraction_evaluate
         self.min_fit_clients = min_fit_clients
@@ -80,7 +82,7 @@ class FedMultiAvg(Strategy):
 
     def __repr__(self) -> str:
         """Compute a string representation of the strategy."""
-        rep = f"FedAvg(accept_failures={self.accept_failures})"
+        rep = f"FedMultiAvg(accept_failures={self.accept_failures})"
         return rep
 
     def num_fit_clients(self, num_available_clients: int) -> Tuple[int, int]:
@@ -258,6 +260,7 @@ def evaluate_weighted_average(metrics):
 
 def get_fedmultiavg_fn(
     model_parameters,
+    client_clusters,
     *,
     fraction_fit=1.0,
     fraction_evaluate=1.0,
@@ -266,6 +269,7 @@ def get_fedmultiavg_fn(
     min_available_clients=2,
 ):
     strategy = FedMultiAvg(
+        client_clusters,
         fraction_fit=fraction_fit,
         fraction_evaluate=fraction_evaluate,
         min_fit_clients=min_fit_clients,

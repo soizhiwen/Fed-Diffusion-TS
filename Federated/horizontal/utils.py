@@ -9,6 +9,16 @@ from Utils.metric_utils import display_scores
 from Utils.cross_correlation import CrossCorrelLoss
 
 
+def random_cluster_clients(num_clients, num_clusters):
+    assert (
+        num_clusters <= num_clients
+    ), "Number of clusters should be less than number of clients"
+    arr = np.arange(num_clients)
+    arr = np.random.permutation(arr)
+    arr = np.array_split(arr, num_clusters)
+    return [x.tolist() for x in [*arr]]
+
+
 def partition(dataset, nr_clients: int, split_type: str, seed: int) -> List[Subset]:
     rng = npr.default_rng(seed)
     labels = np.array([target for _data, target in dataset])

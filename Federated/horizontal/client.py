@@ -20,9 +20,10 @@ from Utils.io_utils import load_yaml_config, instantiate_from_config
 
 
 class FlowerClient(fl.client.NumPyClient):
-    def __init__(self, trainer):
+    def __init__(self, trainer: Trainer):
         self.trainer = trainer
         self.model = trainer.model
+        self.client_id = trainer.args.client_id
 
     def get_parameters(self):
         return [val.cpu().numpy() for _, val in self.model.state_dict().items()]
@@ -43,7 +44,9 @@ class FlowerClient(fl.client.NumPyClient):
         parameters_prime = self.get_parameters()
         dataset = self.trainer.dataloader_info["dataset"]
 
-        return parameters_prime, len(dataset), {}
+        results = {"client_id": self.client_id}
+
+        return parameters_prime, len(dataset), results
 
     def evaluate(self, parameters, config):
         """Evaluate parameters on the locally held test set."""
