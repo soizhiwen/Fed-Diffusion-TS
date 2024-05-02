@@ -124,7 +124,13 @@ def main() -> None:
         config["dataloader"]["train_dataset"]["params"]["data_root"],
         args.client_id,
         nr_clients=args.num_clients,
+<<<<<<< Updated upstream
         split_type="balance_label",
+=======
+        split_type="order",
+        valid_size=0.1,
+        test_size=0.2,
+>>>>>>> Stashed changes
     )
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
