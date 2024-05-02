@@ -5,13 +5,9 @@ cd "$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"/
 python server.py --config_file ../../Config/stocks_hfl.yaml --multi_avg &
 sleep 1  # Sleep for 1s to allow the server to start
 
-<<<<<<< Updated upstream
-num_clients=3
+num_clients=10
 name="exp_1"
 config="../../Config/stocks_hfl.yaml"
-=======
-num_clients=20
->>>>>>> Stashed changes
 
 for i in `seq 0 "$((num_clients - 1))"`; do
     echo "Starting client $i"
