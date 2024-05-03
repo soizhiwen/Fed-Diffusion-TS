@@ -35,7 +35,7 @@ class Trainer(object):
         self.args = args
         self.logger = logger
 
-        self.results_folder = Path(config['solver']['results_folder'] + f'_{model.seq_length}')
+        self.results_folder = Path(f"{self.args.output}/{self.args.name}/{config['solver']['results_folder']}_{model.seq_length}")
         os.makedirs(self.results_folder, exist_ok=True)
 
         start_lr = config['solver'].get('base_lr', 1.0e-4)
@@ -62,7 +62,7 @@ class Trainer(object):
             'ema': self.ema.state_dict(),
             'opt': self.opt.state_dict(),
         }
-        torch.save(data, str(self.results_folder / f'checkpoint-{milestone}.pt'))
+        torch.save(data, str(self.results_folder / f'checkpoint-{milestone}_{self.args.client_id}.pt'))
 
     def load(self, milestone, verbose=False):
         if self.logger is not None and verbose:
