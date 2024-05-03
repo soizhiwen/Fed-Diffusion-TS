@@ -8,7 +8,7 @@ from engine.solver import Trainer
 
 from Data.build_dataloader import build_dataloader, build_dataloader_cond
 from Models.interpretable_diffusion.model_utils import unnormalize_to_zero_to_one
-from Utils.federated import init_clients, split_dataset, concat_latent
+from Federated.vertical.utils import init_clients, split_dataset, concat_latent
 from Utils.io_utils import (
     load_yaml_config,
     seed_everything,

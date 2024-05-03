@@ -58,6 +58,13 @@ def parse_args():
         help="Use FedAvg strategy",
     )
     parser.add_argument(
+        "--split_type",
+        type=str,
+        default="balance_label",
+        help="Type of data partitioning",
+        choices=["balance_label", "random", "non_iid", "order"],
+    )
+    parser.add_argument(
         "--num_cpus",
         type=int,
         default=2,

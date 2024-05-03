@@ -1,22 +1,18 @@
-import sys
-import warnings
-
-sys.path.append("../../")
-warnings.filterwarnings("ignore")
-
 import os
-import argparse
 import torch
 import flwr as fl
 import numpy as np
 from collections import OrderedDict
 
-from Federated.horizontal.utils import load_partition, cal_context_fid, cal_cross_correl_loss
+from Federated.horizontal.utils import (
+    load_partition,
+    cal_context_fid,
+    cal_cross_correl_loss,
+)
 
 from engine.solver import Trainer
 from Data.build_dataloader import build_dataloader_fed
 from Models.interpretable_diffusion.model_utils import unnormalize_to_zero_to_one
-from Utils.io_utils import load_yaml_config, instantiate_from_config
 
 
 class FlowerClient(fl.client.NumPyClient):
@@ -76,10 +72,10 @@ class FlowerClient(fl.client.NumPyClient):
                 fake_data,
             )
 
-        ctx_fid_mean, _ = cal_context_fid(
+        ctx_fid_mean = cal_context_fid(
             ori_data, fake_data, iterations=metric_iterations
         )
-        corr_loss_mean, _ = cal_cross_correl_loss(
+        corr_loss_mean = cal_cross_correl_loss(
             ori_data, fake_data, iterations=metric_iterations
         )
 
@@ -102,9 +98,9 @@ def get_client_fn(config, args, model):
             config["dataloader"]["train_dataset"]["params"]["data_root"],
             args.client_id,
             nr_clients=args.num_clients,
-            split_type="balance_label",
+            split_type=args.split_type,
         )
-        
+
         dataloader_info = build_dataloader_fed(config, dataset, args)
         trainer = Trainer(
             config=config,
@@ -117,58 +113,3 @@ def get_client_fn(config, args, model):
         return FlowerClient(trainer=trainer).to_client()
 
     return client_fn
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Flower")
-    parser.add_argument(
-        "--num_clients",
-        type=int,
-        default=1,
-        help="Specifies the artificial data partition.",
-    )
-    parser.add_argument(
-        "--client_id",
-        type=int,
-        default=0,
-        help="Select client ID to rufn",
-    )
-    parser.add_argument("--name", type=str, default=None)
-    parser.add_argument(
-        "--config_file",
-        type=str,
-        default=None,
-        help="path of config file",
-    )
-    parser.add_argument(
-        "--output",
-        type=str,
-        default="./OUTPUT",
-        help="directory to save the results",
-    )
-
-    args = parser.parse_args()
-    args.save_dir = os.path.join(args.output, f"{args.name}")
-
-    os.makedirs(args.save_dir, exist_ok=True)
-    config = load_yaml_config(args.config_file)
-
-    dataset = load_partition(
-        config["dataloader"]["train_dataset"]["params"]["data_root"],
-        args.client_id,
-        nr_clients=args.num_clients,
-        split_type="balance_label",
-    )
-
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    model = instantiate_from_config(config["model"]).to(device)
-    dataloader_info = build_dataloader_fed(config, dataset, args)
-    trainer = Trainer(config=config, args=args, model=model, dataloader=dataloader_info)
-
-    # Start Flower client
-    client = FlowerClient(trainer=trainer).to_client()
-    fl.client.start_client(server_address="localhost:2424", client=client)
-
-
-if __name__ == "__main__":
-    main()

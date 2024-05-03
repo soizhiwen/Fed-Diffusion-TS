@@ -85,8 +85,8 @@ def cal_context_fid(ori_data, fake_data, iterations=5):
         context_fid_score.append(context_fid)
         print(f"Iter {i}: Context-FID={context_fid}")
 
-    mean, sigma = display_scores(context_fid_score)
-    return mean, sigma
+    mean = display_scores(context_fid_score)
+    return mean
 
 
 def cal_cross_correl_loss(ori_data, fake_data, iterations=5):
@@ -108,5 +108,5 @@ def cal_cross_correl_loss(ori_data, fake_data, iterations=5):
         correlational_score.append(loss.item())
         print(f"Iter {i}: Cross-Correlation Loss={loss.item()}")
 
-    mean, sigma = display_scores(correlational_score)
-    return mean, sigma
+    mean = display_scores(correlational_score)
+    return mean
