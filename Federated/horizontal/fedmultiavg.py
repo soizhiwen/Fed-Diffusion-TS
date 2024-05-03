@@ -287,7 +287,7 @@ class FedMultiAvg(Strategy):
 def fit_config(server_round: int):
     """Return training configuration dict for each round."""
     config = {
-        "local_epochs": 50 if server_round < 5 else 1500,
+        "local_epochs": 500 if server_round < 5 else 1500,
     }
     return config
 
