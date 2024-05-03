@@ -19,7 +19,6 @@ class FlowerClient(fl.client.NumPyClient):
     def __init__(self, trainer: Trainer):
         self.trainer = trainer
         self.model = trainer.model
-        # self.client_id = trainer.args.client_id
 
     def get_parameters(self):
         return [val.cpu().numpy() for _, val in self.model.state_dict().items()]
@@ -92,8 +91,8 @@ def get_client_fn(config, args, model):
     def client_fn(cid: str) -> fl.client.Client:
         """Construct a FlowerClient with its own dataset partition."""
 
+        # Get the partition corresponding to the i-th client
         args.client_id = int(cid)
-        # Let's get the partition corresponding to the i-th client
         dataset = load_partition(
             config["dataloader"]["train_dataset"]["params"]["data_root"],
             args.client_id,
