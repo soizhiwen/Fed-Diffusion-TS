@@ -143,7 +143,6 @@ class FedMultiAvg(Strategy):
         client_manager: ClientManager,
     ) -> List[Tuple[ClientProxy, FitIns]]:
         """Configure the next round of training."""
-        print(f"configure_fit param len: {len(parameters)}")
         config = {}
         if self.on_fit_config_fn is not None:
             # Custom fit config function provided
@@ -159,7 +158,6 @@ class FedMultiAvg(Strategy):
 
         client_pairs = []
         for client in clients:
-            print(f"configure_fit: {client.cid}")
             cluster_id = self.__get_cluster_id(client.cid)
             fit_ins = FitIns(parameters[cluster_id], config)
             client_pairs.append((client, fit_ins))
@@ -174,7 +172,6 @@ class FedMultiAvg(Strategy):
         client_manager: ClientManager,
     ) -> List[Tuple[ClientProxy, EvaluateIns]]:
         """Configure the next round of evaluation."""
-        print(f"configure_evaluate param len: {len(parameters)}")
         # Do not configure federated evaluation if fraction eval is 0.
         if self.fraction_evaluate == 0.0:
             return []
@@ -195,7 +192,6 @@ class FedMultiAvg(Strategy):
 
         client_pairs = []
         for client in clients:
-            print(f"configure_evaluate: {client.cid}")
             cluster_id = self.__get_cluster_id(client.cid)
             evaluate_ins = EvaluateIns(parameters[cluster_id], config)
             client_pairs.append((client, evaluate_ins))
@@ -208,7 +204,7 @@ class FedMultiAvg(Strategy):
         server_round: int,
         results: List[Tuple[ClientProxy, FitRes]],
         failures: List[Union[Tuple[ClientProxy, FitRes], BaseException]],
-    ) -> Tuple[Dict[int, Optional[Parameters]], Dict[str, Scalar]]:
+    ) -> Tuple[Dict[int, Optional[Parameters]], Dict[int, Dict[str, Scalar]]]:
         """Aggregate fit results using weighted average."""
         if not results:
             return None, {}
@@ -237,21 +233,24 @@ class FedMultiAvg(Strategy):
             cluster_parameters_aggregated[k] = ndarrays_to_parameters(v)
 
         # Aggregate custom metrics if aggregation fn was provided
-        metrics_aggregated = {}
+        cluster_metrics_aggregated = {}
         if self.fit_metrics_aggregation_fn:
-            fit_metrics = [(res.num_examples, res.metrics) for _, res in results]
-            metrics_aggregated = self.fit_metrics_aggregation_fn(fit_metrics)
+            for k, v in sorted(cluster_results.items()):
+                fit_metrics = [(res.num_examples, res.metrics) for _, res in v]
+                cluster_metrics_aggregated[k] = self.fit_metrics_aggregation_fn(
+                    fit_metrics
+                )
         elif server_round == 1:  # Only log this warning once
             log(WARNING, "No fit_metrics_aggregation_fn provided")
 
-        return cluster_parameters_aggregated, metrics_aggregated
+        return cluster_parameters_aggregated, cluster_metrics_aggregated
 
     def aggregate_evaluate(
         self,
         server_round: int,
         results: List[Tuple[ClientProxy, EvaluateRes]],
         failures: List[Union[Tuple[ClientProxy, EvaluateRes], BaseException]],
-    ) -> Tuple[Dict[int, Optional[float]], Dict[str, Scalar]]:
+    ) -> Tuple[Dict[int, Optional[float]], Dict[int, Dict[str, Scalar]]]:
         """Aggregate evaluation losses using weighted average."""
         if not results:
             return None, {}
@@ -272,14 +271,17 @@ class FedMultiAvg(Strategy):
             )
 
         # Aggregate custom metrics if aggregation fn was provided
-        metrics_aggregated = {}
+        cluster_metrics_aggregated = {}
         if self.evaluate_metrics_aggregation_fn:
-            eval_metrics = [(res.num_examples, res.metrics) for _, res in results]
-            metrics_aggregated = self.evaluate_metrics_aggregation_fn(eval_metrics)
+            for k, v in sorted(cluster_results.items()):
+                eval_metrics = [(res.num_examples, res.metrics) for _, res in v]
+                cluster_metrics_aggregated[k] = self.evaluate_metrics_aggregation_fn(
+                    eval_metrics
+                )
         elif server_round == 1:  # Only log this warning once
             log(WARNING, "No evaluate_metrics_aggregation_fn provided")
 
-        return cluster_loss_aggregated, metrics_aggregated
+        return cluster_loss_aggregated, cluster_metrics_aggregated
 
 
 def fit_config(server_round: int):
