@@ -7,7 +7,7 @@ import flwr as fl
 from Federated.horizontal.fedavg import get_fedavg_fn
 from Federated.horizontal.fedmultiavg import get_fedmultiavg_fn
 from Federated.horizontal.client import get_client_fn
-from Federated.horizontal.utils import random_cluster_clients
+from Federated.horizontal.utils import random_cluster_clients, plot_metrics
 
 from Utils.io_utils import load_yaml_config, instantiate_from_config
 
@@ -104,13 +104,15 @@ def main():
         "num_gpus": args.num_gpus,
     }
 
-    fl.simulation.start_simulation(
+    history = fl.simulation.start_simulation(
         client_fn=client_fn,
         num_clients=args.num_clients,
         client_resources=client_resources,
         config=fl.server.ServerConfig(num_rounds=args.num_rounds),
         strategy=strategy,
     )
+
+    plot_metrics(history, args.save_dir)
 
 
 if __name__ == "__main__":

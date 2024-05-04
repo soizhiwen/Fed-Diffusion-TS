@@ -304,10 +304,14 @@ def evaluate_config(server_round: int):
 def evaluate_weighted_average(metrics):
     # Multiply context fid of each client by number of examples used
     context_fids = [num_examples * m["context_fid"] for num_examples, m in metrics]
+    cross_corrs = [num_examples * m["cross_corr"] for num_examples, m in metrics]
     examples = [num_examples for num_examples, _ in metrics]
 
     # Aggregate and return custom metric (weighted average)
-    return {"context_fid": sum(context_fids) / sum(examples)}
+    return {
+        "context_fid": sum(context_fids) / sum(examples),
+        "cross_corr": sum(cross_corrs) / sum(examples),
+    }
 
 
 def get_fedmultiavg_fn(

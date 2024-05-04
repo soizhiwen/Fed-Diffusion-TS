@@ -7,7 +7,7 @@ from collections import OrderedDict
 from Federated.horizontal.utils import (
     load_partition,
     cal_context_fid,
-    cal_cross_correl_loss,
+    cal_cross_corr,
 )
 
 from engine.solver import Trainer
@@ -74,11 +74,16 @@ class FlowerClient(fl.client.NumPyClient):
         ctx_fid_mean = cal_context_fid(
             ori_data, fake_data, iterations=metric_iterations
         )
-        corr_loss_mean = cal_cross_correl_loss(
+        cross_corr_mean = cal_cross_corr(
             ori_data, fake_data, iterations=metric_iterations
         )
 
-        return float(corr_loss_mean), len(dataset), {"context_fid": float(ctx_fid_mean)}
+        metrics = {
+            "context_fid": float(ctx_fid_mean),
+            "cross_corr": float(cross_corr_mean),
+        }
+
+        return 0.0, len(dataset), metrics
 
 
 def get_client_fn(config, args, model):
