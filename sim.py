@@ -7,7 +7,11 @@ import flwr as fl
 from Federated.horizontal.fedavg import get_fedavg_fn
 from Federated.horizontal.fedmultiavg import get_fedmultiavg_fn
 from Federated.horizontal.client import get_client_fn
-from Federated.horizontal.utils import random_cluster_clients, plot_metrics
+from Federated.horizontal.utils import (
+    random_cluster_clients,
+    random_exclude_feats,
+    plot_metrics,
+)
 
 from Utils.io_utils import load_yaml_config, instantiate_from_config
 
@@ -91,12 +95,19 @@ def main():
     model = instantiate_from_config(config["model"]).to(device)
     model_parameters = [val.cpu().numpy() for _, val in model.state_dict().items()]
 
-    client_fn = get_client_fn(config, args, model)
-
     if args.multi_avg:
-        client_clusters = random_cluster_clients(args.num_clients, args.num_clusters)
+        client_clusters = random_cluster_clients(
+            args.num_clients, args.num_clusters, args.save_dir
+        )
+        exclude_feats_clusters = random_exclude_feats(
+            config["model"]["params"]["feature_size"], args.num_clusters, args.save_dir
+        )
+        client_fn = get_client_fn(
+            config, args, model, exclude_feats_clusters, client_clusters
+        )
         strategy = get_fedmultiavg_fn(model_parameters, client_clusters)
     else:
+        client_fn = get_client_fn(config, args, model)
         strategy = get_fedavg_fn(model_parameters)
 
     client_resources = {

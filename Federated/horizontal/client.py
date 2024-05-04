@@ -5,6 +5,7 @@ import numpy as np
 from collections import OrderedDict
 
 from Federated.horizontal.utils import (
+    get_cluster_id,
     load_partition,
     cal_context_fid,
     cal_cross_corr,
@@ -86,7 +87,9 @@ class FlowerClient(fl.client.NumPyClient):
         return 0.0, len(dataset), metrics
 
 
-def get_client_fn(config, args, model):
+def get_client_fn(
+    config, args, model, exclude_feats_clusters=None, client_clusters=None
+):
     """Return a function to construct a client.
 
     The VirtualClientEngine will execute this function whenever a client is sampled by
@@ -105,7 +108,12 @@ def get_client_fn(config, args, model):
             split_type=args.split_type,
         )
 
-        dataloader_info = build_dataloader_fed(config, dataset, args)
+        exclude_feats = None
+        if exclude_feats_clusters is not None:
+            cluster_id = get_cluster_id(args.client_id, client_clusters)
+            exclude_feats = exclude_feats_clusters[cluster_id]
+
+        dataloader_info = build_dataloader_fed(config, dataset, args, exclude_feats)
         trainer = Trainer(
             config=config,
             args=args,

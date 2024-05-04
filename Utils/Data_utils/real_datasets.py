@@ -27,7 +27,8 @@ class CustomDataset(Dataset):
         missing_ratio=None,
         style='separate', 
         distribution='geometric', 
-        mean_mask_length=3
+        mean_mask_length=3,
+        exclude_feats=None,
     ):
         super(CustomDataset, self).__init__()
         assert period in ['train', 'test'], 'period must be train or test.'
@@ -35,6 +36,7 @@ class CustomDataset(Dataset):
             assert ~(predict_length is not None or missing_ratio is not None), ''
         self.name, self.pred_len, self.missing_ratio = name, predict_length, missing_ratio
         self.style, self.distribution, self.mean_mask_length = style, distribution, mean_mask_length
+        self.exclude_feats = exclude_feats
         self.data_root, self.dataset = data_root, dataset
         if self.dataset is not None:
             self.rawdata, self.scaler = self.fit_data(self.dataset)
@@ -55,6 +57,12 @@ class CustomDataset(Dataset):
         train, inference = self.__getsamples(self.data, proportion, seed)
 
         self.samples = train if period == 'train' else inference
+        if period == 'train' and missing_ratio is not None:
+            self.masking = self.mask_data(seed)
+            self.samples = self.samples * self.masking
+            if self.save2npy:
+                np.save(os.path.join(self.dir, f"{self.name}_norm_masked_{self.window}_train.npy"), self.samples)
+
         if period == 'test':
             if missing_ratio is not None:
                 self.masking = self.mask_data(seed)
@@ -168,7 +176,7 @@ class CustomDataset(Dataset):
         for idx in range(self.samples.shape[0]):
             x = self.samples[idx, :, :]  # (seq_length, feat_dim) array
             mask = noise_mask(x, self.missing_ratio, self.mean_mask_length, self.style,
-                              self.distribution)  # (seq_length, feat_dim) boolean array
+                              self.distribution, self.exclude_feats)  # (seq_length, feat_dim) boolean array
             masks[idx, :, :] = mask
 
         if self.save2npy:

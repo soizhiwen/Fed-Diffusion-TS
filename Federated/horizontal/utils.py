@@ -13,15 +13,53 @@ from Utils.metric_utils import display_scores
 from Utils.cross_correlation import CrossCorrelLoss
 
 
-def random_cluster_clients(num_clients, num_clusters, seed=42):
+def get_cluster_id(client_id, client_clusters):
+    client_id = int(client_id)
+    for idx, cluster in enumerate(client_clusters):
+        if client_id in cluster:
+            return idx
+    return -1
+
+
+def random_cluster_clients(num_clients, num_clusters, save_dir=None, seed=42):
     assert (
         num_clusters <= num_clients
     ), "Number of clusters should be less than number of clients"
     rng = npr.default_rng(seed)
-    arr = np.arange(num_clients)
-    arr = rng.permutation(arr)
+    arr = rng.permutation(num_clients)
     arr = np.array_split(arr, num_clusters)
+    if save_dir:
+        df = pd.DataFrame(arr, dtype=pd.Int64Dtype())
+        df.to_csv(f"{save_dir}/client_clusters.csv", header=False, index=False)
     return arr
+
+
+def random_exclude_feats(num_feats, num_clusters, save_dir=None):
+    if num_clusters == 1:
+        return None
+
+    def generate_exclude_feats(seed):
+        npr.seed(seed)
+        num_exclude_feats = npr.randint(2, num_feats)
+        return npr.choice(num_feats, num_exclude_feats, replace=False)
+
+    cluster_exclude_feats = []
+    for cluster in range(num_clusters - 1):
+        cluster_exclude_feats.append(generate_exclude_feats(cluster))
+
+    concat_exclude_feats = np.concatenate(cluster_exclude_feats, axis=0)
+    unique_exclude_feats = np.unique(concat_exclude_feats)
+    not_selected_feats = np.setdiff1d(np.arange(num_feats), unique_exclude_feats)
+
+    if not_selected_feats.size > 0:
+        cluster_exclude_feats.append(not_selected_feats)
+    else:
+        cluster_exclude_feats.append(generate_exclude_feats(42))
+
+    if save_dir:
+        df = pd.DataFrame(cluster_exclude_feats, dtype=pd.Int64Dtype())
+        df.to_csv(f"{save_dir}/exclude_feats_clusters.csv", header=False, index=False)
+    return cluster_exclude_feats
 
 
 def partition(dataset, nr_clients: int, split_type: str, seed: int) -> List[Subset]:
@@ -96,7 +134,7 @@ def cal_context_fid(ori_data, fake_data, iterations=5):
 
 def cal_cross_corr(ori_data, fake_data, iterations=5):
     def random_choice(size, num_select=100):
-        select_idx = np.random.randint(low=0, high=size, size=(num_select,))
+        select_idx = npr.randint(low=0, high=size, size=(num_select,))
         return select_idx
 
     x_real = torch.from_numpy(ori_data)

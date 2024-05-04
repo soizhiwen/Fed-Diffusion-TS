@@ -25,6 +25,8 @@ from flwr.server.strategy.aggregate import (
 )
 from flwr.server.strategy.strategy import Strategy
 
+from Federated.horizontal.utils import get_cluster_id
+
 
 WARNING_MIN_AVAILABLE_CLIENTS_TOO_LOW = """
 Setting `min_available_clients` lower than `min_fit_clients` or
@@ -81,8 +83,6 @@ class FedMultiAvg(Strategy):
         self.evaluate_metrics_aggregation_fn = evaluate_metrics_aggregation_fn
         self.inplace = inplace
 
-        print(f"client_clusters: {client_clusters}")
-
     def __repr__(self) -> str:
         """Compute a string representation of the strategy."""
         rep = f"FedMultiAvg(accept_failures={self.accept_failures})"
@@ -98,17 +98,10 @@ class FedMultiAvg(Strategy):
         num_clients = int(num_available_clients * self.fraction_evaluate)
         return max(num_clients, self.min_evaluate_clients), self.min_available_clients
 
-    def __get_cluster_id(self, client_id):
-        client_id = int(client_id)
-        for idx, cluster in enumerate(self.client_clusters):
-            if client_id in cluster:
-                return idx
-        return -1
-
     def __cluster_results(self, results):
         cluster_results = defaultdict(list)
         for client, fit_res in results:
-            cluster_id = self.__get_cluster_id(client.cid)
+            cluster_id = get_cluster_id(client.cid, self.client_clusters)
             cluster_results[cluster_id].append((client, fit_res))
         return cluster_results
 
@@ -158,7 +151,7 @@ class FedMultiAvg(Strategy):
 
         client_pairs = []
         for client in clients:
-            cluster_id = self.__get_cluster_id(client.cid)
+            cluster_id = get_cluster_id(client.cid, self.client_clusters)
             fit_ins = FitIns(parameters[cluster_id], config)
             client_pairs.append((client, fit_ins))
 
@@ -192,7 +185,7 @@ class FedMultiAvg(Strategy):
 
         client_pairs = []
         for client in clients:
-            cluster_id = self.__get_cluster_id(client.cid)
+            cluster_id = get_cluster_id(client.cid, self.client_clusters)
             evaluate_ins = EvaluateIns(parameters[cluster_id], config)
             client_pairs.append((client, evaluate_ins))
 
