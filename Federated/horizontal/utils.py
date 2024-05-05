@@ -171,7 +171,7 @@ def plot_metrics(history, save_dir):
 
     for k, v in metrics.items():
         df = pd.DataFrame(v, columns=["Round", k, "Cluster"])
-        ax = sns.lineplot(data=df, x="Round", y=k, hue="Cluster", seed=42)
+        ax = sns.lineplot(data=df, x="Round", y=k, hue="Cluster", markers=True, seed=42)
         sns.move_legend(ax, "upper left", bbox_to_anchor=(1, 1))
         _ = ax.set_xticks(df["Round"].unique())
         _ = ax.set_xlabel("Round")

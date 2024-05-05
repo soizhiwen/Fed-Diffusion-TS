@@ -280,7 +280,7 @@ class FedMultiAvg(Strategy):
 def fit_config(server_round: int):
     """Return training configuration dict for each round."""
     config = {
-        "local_epochs": 500 if server_round < 5 else 1500,
+        "local_epochs": 1000,
     }
     return config
 
@@ -289,7 +289,7 @@ def evaluate_config(server_round: int):
     """Return evaluation configuration dict for each round."""
     config = {
         "size_every": 2001,
-        "metric_iterations": 1 if server_round < 5 else 5,
+        "metric_iterations": 5,
     }
     return config
 

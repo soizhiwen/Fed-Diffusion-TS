@@ -105,7 +105,13 @@ def main():
         client_fn = get_client_fn(
             config, args, model, exclude_feats_clusters, client_clusters
         )
-        strategy = get_fedmultiavg_fn(model_parameters, client_clusters)
+        strategy = get_fedmultiavg_fn(
+            model_parameters,
+            client_clusters,
+            min_fit_clients=args.num_clients,
+            min_evaluate_clients=args.num_clients,
+            min_available_clients=args.num_clients,
+        )
     else:
         client_fn = get_client_fn(config, args, model)
         strategy = get_fedavg_fn(model_parameters)
