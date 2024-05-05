@@ -53,6 +53,7 @@ class Diffusion_TS(nn.Module):
             padding_size=None,
             use_ff=True,
             reg_weight=None,
+            exclude_feats=None,
             **kwargs
     ):
         super(Diffusion_TS, self).__init__()
@@ -80,6 +81,7 @@ class Diffusion_TS(nn.Module):
         timesteps, = betas.shape
         self.num_timesteps = int(timesteps)
         self.loss_type = loss_type
+        self.exclude_feats = exclude_feats
 
         # sampling related parameters
 
@@ -244,6 +246,10 @@ class Diffusion_TS(nn.Module):
 
         x = self.q_sample(x_start=x_start, t=t, noise=noise)  # noise sample
         model_out = self.output(x, t, padding_masks)
+
+        if self.exclude_feats is not None:
+            model_out = model_out[:, :, self.exclude_feats]
+            target = target[:, :, self.exclude_feats]
 
         train_loss = self.loss_fn(model_out, target, reduction='none')
 

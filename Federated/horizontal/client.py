@@ -113,6 +113,7 @@ def get_client_fn(
             cluster_id = get_cluster_id(args.client_id, client_clusters)
             exclude_feats = exclude_feats_clusters[cluster_id]
 
+        model.exclude_feats = exclude_feats
         dataloader_info = build_dataloader_fed(config, dataset, args, exclude_feats)
         trainer = Trainer(
             config=config,
