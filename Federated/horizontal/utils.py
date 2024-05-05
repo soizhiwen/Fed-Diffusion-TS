@@ -178,6 +178,5 @@ def plot_metrics(history, save_dir):
         _ = ax.set_ylabel(k)
         name = k.lower().replace(" ", "_")
         df.to_csv(f"{save_dir}/{name}.csv", index=False)
-        plt.tight_layout()
-        plt.savefig(f"{save_dir}/{name}.png", dpi=300)
+        plt.savefig(f"{save_dir}/{name}.pdf", bbox_inches="tight")
         plt.clf()
