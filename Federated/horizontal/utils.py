@@ -157,6 +157,10 @@ def cal_cross_corr(ori_data, fake_data, iterations=5):
 
 def plot_metrics(history, save_dir):
     metrics = defaultdict(list)
+    for cluster_id, rounds in history.metrics_distributed_fit.items():
+        for r, m in rounds:
+            metrics["Train Loss"].append((r, m["train_loss"], cluster_id))
+
     for cluster_id, rounds in history.metrics_distributed.items():
         for r, m in rounds:
             metrics["Context-FID Score"].append((r, m["context_fid"], cluster_id))

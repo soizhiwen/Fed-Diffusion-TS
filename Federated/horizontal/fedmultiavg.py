@@ -294,6 +294,17 @@ def evaluate_config(server_round: int):
     return config
 
 
+def fit_weighted_average(metrics):
+    # Multiply context fid of each client by number of examples used
+    train_loss = [num_examples * m["train_loss"] for num_examples, m in metrics]
+    examples = [num_examples for num_examples, _ in metrics]
+
+    # Aggregate and return custom metric (weighted average)
+    return {
+        "train_loss": sum(train_loss) / sum(examples),
+    }
+
+
 def evaluate_weighted_average(metrics):
     # Multiply context fid of each client by number of examples used
     context_fids = [num_examples * m["context_fid"] for num_examples, m in metrics]
@@ -327,6 +338,7 @@ def get_fedmultiavg_fn(
         on_fit_config_fn=fit_config,
         on_evaluate_config_fn=evaluate_config,
         initial_parameters=fl.common.ndarrays_to_parameters(model_parameters),
+        fit_metrics_aggregation_fn=fit_weighted_average,
         evaluate_metrics_aggregation_fn=evaluate_weighted_average,
     )
     return strategy

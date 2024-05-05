@@ -82,6 +82,7 @@ class Trainer(object):
             tic = time.time()
             self.logger.log_info('{}: start training...'.format(self.args.name), check_primary=False)
 
+        total_losses = 0.
         with tqdm(initial=step, total=self.train_num_steps, disable=True) as pbar:
             while step < self.train_num_steps:
                 total_loss = 0.
@@ -92,6 +93,7 @@ class Trainer(object):
                     loss.backward()
                     total_loss += loss.item()
 
+                total_losses += total_loss
                 pbar.set_description(f'loss: {total_loss:.6f}')
 
                 clip_grad_norm_(self.model.parameters(), 1.0)
@@ -123,6 +125,8 @@ class Trainer(object):
         print('training complete')
         if self.logger is not None:
             self.logger.log_info('Training done, time: {:.2f}'.format(time.time() - tic))
+        
+        return total_losses / self.train_num_steps
 
     def sample(self, num, size_every, shape=None):
         if self.logger is not None:

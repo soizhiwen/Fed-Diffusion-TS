@@ -35,12 +35,12 @@ class FlowerClient(fl.client.NumPyClient):
 
         # Get hyperparameters for this round
         self.trainer.train_num_steps = config["local_epochs"]
-        self.trainer.train()
+        train_loss = self.trainer.train()
 
         parameters_prime = self.get_parameters()
         dataset = self.trainer.dataloader_info["dataset"]
 
-        results = {}
+        results = {"train_loss": float(train_loss)}
 
         return parameters_prime, len(dataset), results
 
