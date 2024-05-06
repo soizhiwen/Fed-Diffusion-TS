@@ -1,8 +1,9 @@
+from functools import reduce
 from logging import WARNING
 from typing import Callable, Dict, List, Optional, Tuple, Union
 from collections import defaultdict
+import numpy as np
 
-import flwr as fl
 from flwr.common import (
     EvaluateIns,
     EvaluateRes,
@@ -18,11 +19,7 @@ from flwr.common import (
 from flwr.common.logger import log
 from flwr.server.client_manager import ClientManager
 from flwr.server.client_proxy import ClientProxy
-from flwr.server.strategy.aggregate import (
-    aggregate,
-    aggregate_inplace,
-    weighted_loss_avg,
-)
+from flwr.server.strategy.aggregate import weighted_loss_avg
 from flwr.server.strategy.strategy import Strategy
 
 from Federated.horizontal.utils import get_cluster_id
@@ -105,12 +102,95 @@ class FedMultiAvg(Strategy):
             cluster_results[cluster_id].append((client, fit_res))
         return cluster_results
 
+    def __aggregate(
+        self, results: List[Tuple[NDArrays, int]], len_model_params: int
+    ) -> NDArrays:
+        """Compute weighted average."""
+        # Calculate the total number of examples used during training
+        num_examples_total = sum(num_examples for (_, num_examples) in results)
+
+        # Create a list of weights, each multiplied by the related number of examples
+        model_weighted_weights = [
+            [layer * num_examples for layer in weights[:len_model_params]]
+            for weights, num_examples in results
+        ]
+
+        # Compute average weights of each layer
+        model_weights_prime: NDArrays = [
+            reduce(np.add, layer_updates) / num_examples_total
+            for layer_updates in zip(*model_weighted_weights)
+        ]
+
+        # Aggregate EMA params
+        ema_weighted_weights = [
+            [layer * num_examples for layer in weights[len_model_params:]]
+            for weights, num_examples in results
+        ]
+
+        # Compute average weights of each layer
+        ema_weights_prime: NDArrays = [
+            reduce(np.add, layer_updates) / num_examples_total
+            for layer_updates in zip(*ema_weighted_weights)
+        ]
+        return model_weights_prime + ema_weights_prime
+
+    def __aggregate_inplace(
+        self, results: List[Tuple[ClientProxy, FitRes]], cluster_id: int
+    ) -> NDArrays:
+        """Compute in-place weighted average."""
+        # Count total examples
+        num_examples_total = sum(fit_res.num_examples for (_, fit_res) in results)
+
+        # Compute scaling factors for each result
+        scaling_factors = [
+            fit_res.num_examples / num_examples_total for _, fit_res in results
+        ]
+
+        # Let's do in-place aggregation
+        # Get first result, then add up each other
+        len_model_params = results[0][1].metrics["len_model_params"]
+        self.len_model_params_clusters[cluster_id] = len_model_params
+        model_params = [
+            scaling_factors[0] * x
+            for x in parameters_to_ndarrays(results[0][1].parameters)[:len_model_params]
+        ]
+        for i, (_, fit_res) in enumerate(results[1:]):
+            res = (
+                scaling_factors[i + 1] * x
+                for x in parameters_to_ndarrays(fit_res.parameters)[:len_model_params]
+            )
+            model_params = [
+                reduce(np.add, layer_updates)
+                for layer_updates in zip(model_params, res)
+            ]
+
+        # Aggregate EMA params
+        ema_params = [
+            scaling_factors[0] * x
+            for x in parameters_to_ndarrays(results[0][1].parameters)[len_model_params:]
+        ]
+        for i, (_, fit_res) in enumerate(results[1:]):
+            res = (
+                scaling_factors[i + 1] * x
+                for x in parameters_to_ndarrays(fit_res.parameters)[len_model_params:]
+            )
+            ema_params = [
+                reduce(np.add, layer_updates) for layer_updates in zip(ema_params, res)
+            ]
+
+        return model_params + ema_params
+
     def initialize_parameters(
         self, client_manager: ClientManager
     ) -> Dict[int, Optional[Parameters]]:
         """Initialize global model parameters."""
+        self.len_model_params_clusters = {}
+        len_model_params = len(self.initial_parameters)
+
         initial_parameters = {}
+        self.initial_parameters = ndarrays_to_parameters(self.initial_parameters)
         for idx in range(len(self.client_clusters)):
+            self.len_model_params_clusters[idx] = len_model_params
             initial_parameters[idx] = self.initial_parameters
         self.initial_parameters = None  # Don't keep initial parameters in memory
         return initial_parameters
@@ -152,6 +232,7 @@ class FedMultiAvg(Strategy):
         client_pairs = []
         for client in clients:
             cluster_id = get_cluster_id(client.cid, self.client_clusters)
+            config["len_model_params"] = self.len_model_params_clusters[cluster_id]
             fit_ins = FitIns(parameters[cluster_id], config)
             client_pairs.append((client, fit_ins))
 
@@ -186,6 +267,7 @@ class FedMultiAvg(Strategy):
         client_pairs = []
         for client in clients:
             cluster_id = get_cluster_id(client.cid, self.client_clusters)
+            config["len_model_params"] = self.len_model_params_clusters[cluster_id]
             evaluate_ins = EvaluateIns(parameters[cluster_id], config)
             client_pairs.append((client, evaluate_ins))
 
@@ -211,7 +293,7 @@ class FedMultiAvg(Strategy):
         if self.inplace:
             # Does in-place weighted average of results
             for k, v in cluster_results.items():
-                cluster_aggregated_ndarrays[k] = aggregate_inplace(v)
+                cluster_aggregated_ndarrays[k] = self.__aggregate_inplace(v, k)
         else:
             for k, v in cluster_results.items():
                 # Convert results
@@ -219,7 +301,11 @@ class FedMultiAvg(Strategy):
                     (parameters_to_ndarrays(fit_res.parameters), fit_res.num_examples)
                     for _, fit_res in v
                 ]
-                cluster_aggregated_ndarrays[k] = aggregate(weights_results)
+                len_model_params = v[0][1].metrics["len_model_params"]
+                self.len_model_params_clusters[k] = len_model_params
+                cluster_aggregated_ndarrays[k] = self.__aggregate(
+                    weights_results, len_model_params
+                )
 
         cluster_parameters_aggregated = {}
         for k, v in cluster_aggregated_ndarrays.items():
@@ -337,7 +423,7 @@ def get_fedmultiavg_fn(
         min_available_clients=min_available_clients,
         on_fit_config_fn=fit_config,
         on_evaluate_config_fn=evaluate_config,
-        initial_parameters=fl.common.ndarrays_to_parameters(model_parameters),
+        initial_parameters=model_parameters,
         fit_metrics_aggregation_fn=fit_weighted_average,
         evaluate_metrics_aggregation_fn=evaluate_weighted_average,
     )

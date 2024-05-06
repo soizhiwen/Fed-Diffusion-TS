@@ -72,7 +72,7 @@ def extract_time (data):
   return time, max_seq_len
 
 
-def visualization(ori_data, generated_data, analysis, compare=3000):
+def visualization(ori_data, generated_data, analysis, compare=3000, name="", save_dir=""):
     """Using PCA or tSNE for generated and original data visualization.
   
   Args:
@@ -121,10 +121,11 @@ def visualization(ori_data, generated_data, analysis, compare=3000):
                     c=colors[anal_sample_no:], alpha=0.2, label="Synthetic")
 
         ax.legend()
-        plt.title('PCA plot')
-        plt.xlabel('x-pca')
-        plt.ylabel('y_pca')
-        plt.show()
+        # plt.title('PCA plot')
+        plt.xlabel('x')
+        plt.ylabel('y')
+        plt.savefig(f"{save_dir}/pca_{name}.pdf", bbox_inches="tight")
+        # plt.show()
 
     elif analysis == 'tsne':
 
@@ -145,10 +146,11 @@ def visualization(ori_data, generated_data, analysis, compare=3000):
 
         ax.legend()
 
-        plt.title('t-SNE plot')
-        plt.xlabel('x-tsne')
-        plt.ylabel('y_tsne')
-        plt.show()
+        # plt.title('t-SNE plot')
+        plt.xlabel('x')
+        plt.ylabel('y')
+        plt.savefig(f"{save_dir}/tsne_{name}.pdf", bbox_inches="tight")
+        # plt.show()
 
     elif analysis == 'kernel':
        
@@ -168,7 +170,8 @@ def visualization(ori_data, generated_data, analysis, compare=3000):
 
         # plt.savefig(str(args.save_dir)+"/"+args.model1+"_histo.png", dpi=100,bbox_inches='tight')
         # plt.ylim((0, 12))
-        plt.show()
+        plt.savefig(f"{save_dir}/kernel_{name}.pdf", bbox_inches="tight")
+        # plt.show()
         plt.close()
 
 
