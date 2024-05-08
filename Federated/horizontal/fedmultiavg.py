@@ -180,6 +180,36 @@ class FedMultiAvg(Strategy):
 
         return model_params + ema_params
 
+    def __partial_aggregate_inplace(
+        self, results: List[Tuple[ClientProxy, FitRes]]
+    ) -> NDArrays:
+        """Compute in-place weighted average."""
+        # Count total examples
+        num_examples_total = sum(fit_res.num_examples for (_, fit_res) in results)
+
+        # Compute scaling factors for each result
+        scaling_factors = [
+            fit_res.num_examples / num_examples_total for _, fit_res in results
+        ]
+
+        # Let's do in-place aggregation
+        # Get first result, then add up each other
+        len_model_params = results[0][1].metrics["len_model_params"]
+        params = [
+            scaling_factors[0] * x
+            for x in parameters_to_ndarrays(results[0][1].parameters)[:len_model_params]
+        ]
+        for i, (_, fit_res) in enumerate(results[1:]):
+            res = (
+                scaling_factors[i + 1] * x
+                for x in parameters_to_ndarrays(fit_res.parameters)[:len_model_params]
+            )
+            params = [
+                reduce(np.add, layer_updates) for layer_updates in zip(params, res)
+            ]
+
+        return params
+
     def initialize_parameters(
         self, client_manager: ClientManager
     ) -> Dict[int, Optional[Parameters]]:
@@ -306,6 +336,19 @@ class FedMultiAvg(Strategy):
                 cluster_aggregated_ndarrays[k] = self.__aggregate(
                     weights_results, len_model_params
                 )
+
+        if server_round % 2 == 0:
+            for k in cluster_results:
+                for i, _ in enumerate(cluster_results[k]):
+                    cluster_results[k][i][1].parameters = ndarrays_to_parameters(
+                        cluster_aggregated_ndarrays[k]
+                    )
+            all_fit_res = sum(cluster_results.values(), [])
+            partial_aggregated_ndarrays = self.__partial_aggregate_inplace(all_fit_res)
+
+            for k, v in cluster_aggregated_ndarrays.items():
+                len_model_params = self.len_model_params_clusters[k]
+                cluster_aggregated_ndarrays[k][:len_model_params] = partial_aggregated_ndarrays    
 
         cluster_parameters_aggregated = {}
         for k, v in cluster_aggregated_ndarrays.items():
