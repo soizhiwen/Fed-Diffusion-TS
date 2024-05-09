@@ -6,8 +6,8 @@ from Federated.horizontal.fed_utils import *
 def get_fedavg_fn(
     model_parameters,
     *,
-    fraction_fit=1,
-    fraction_evaluate=1,
+    fraction_fit=1.0,
+    fraction_evaluate=1.0,
     min_fit_clients=2,
     min_evaluate_clients=2,
     min_available_clients=2,
