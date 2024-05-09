@@ -21,19 +21,21 @@ class FlowerClient(fl.client.NumPyClient):
         self.trainer = trainer
         self.model = trainer.model
         self.ema = trainer.ema
+        self.len_model_params = trainer.args.len_model_params
+        self.save_dir = trainer.args.save_dir
 
     def get_parameters(self):
         model_params = [val.cpu().numpy() for _, val in self.model.state_dict().items()]
         ema_params = [val.cpu().numpy() for _, val in self.ema.state_dict().items()]
-        return model_params + ema_params, len(model_params)
+        return model_params + ema_params
 
-    def set_parameters(self, parameters, len_model_params):
-        model_params = parameters[:len_model_params]
+    def set_parameters(self, parameters):
+        model_params = parameters[:self.len_model_params]
         params_dict = zip(self.model.state_dict().keys(), model_params)
         state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
         self.model.load_state_dict(state_dict, strict=True)
 
-        ema_params = parameters[len_model_params:]
+        ema_params = parameters[self.len_model_params:]
         if ema_params:
             params_dict = zip(self.ema.state_dict().keys(), ema_params)
             state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
@@ -41,26 +43,22 @@ class FlowerClient(fl.client.NumPyClient):
 
     def fit(self, parameters, config):
         # Update local model parameters
-        self.set_parameters(parameters, config["len_model_params"])
+        self.set_parameters(parameters)
 
         # Get hyperparameters for this round
         self.trainer.train_num_steps = config["local_epochs"]
         train_loss = self.trainer.train()
 
-        parameters_prime, len_model_params = self.get_parameters()
+        parameters_prime = self.get_parameters()
         dataset = self.trainer.dataloader_info["dataset"]
-
-        results = {
-            "train_loss": float(train_loss),
-            "len_model_params": int(len_model_params),
-        }
+        results = {"train_loss": float(train_loss)}
 
         return parameters_prime, len(dataset), results
 
     def evaluate(self, parameters, config):
         """Evaluate parameters on the locally held test set."""
         # Update local model parameters
-        self.set_parameters(parameters, config["len_model_params"])
+        self.set_parameters(parameters)
 
         # Get config values
         size_every = config["size_every"]
@@ -68,18 +66,18 @@ class FlowerClient(fl.client.NumPyClient):
 
         dataset = self.trainer.dataloader_info["dataset"]
         seq_length, feature_dim = dataset.window, dataset.var_num
+        
         ori_data = np.load(
             f"{dataset.dir}/{dataset.name}_norm_truth_{seq_length}_train.npy"
         )
+        
         fake_data = self.trainer.sample(
             num=len(dataset), size_every=size_every, shape=[seq_length, feature_dim]
         )
+
         if dataset.auto_norm:
             fake_data = unnormalize_to_zero_to_one(fake_data)
-            np.save(
-                f"{self.trainer.args.save_dir}/ddpm_fake_{dataset.name}.npy",
-                fake_data,
-            )
+            np.save(f"{self.save_dir}/ddpm_fake_{dataset.name}.npy", fake_data)
 
         ctx_fid_mean = cal_context_fid(
             ori_data, fake_data, iterations=metric_iterations
