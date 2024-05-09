@@ -96,23 +96,35 @@ def main():
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = instantiate_from_config(config["model"]).to(device)
     model_parameters = [val.cpu().numpy() for _, val in model.state_dict().items()]
+    args.len_model_params = len(model_parameters)
 
     if args.strategy == "fedavg":
+
+        if "missing_ratio" in config["dataloader"]["train_dataset"]["params"]:
+            args.exclude_feats_parts = random_exclude_feats(
+                model.feature_size, args.num_clients, args.save_dir
+            )
+
         client_fn = get_client_fn(config, args, model)
-        strategy = get_fedavg_fn(model_parameters)
+        strategy = get_fedavg_fn(
+            model_parameters,
+            min_fit_clients=args.num_clients,
+            min_evaluate_clients=args.num_clients,
+            min_available_clients=args.num_clients,
+        )
 
     elif args.strategy == "fedmultiavg":
         args.client_clusters = random_cluster_clients(
             args.num_clients, args.num_clusters, args.save_dir
         )
-        args.exclude_feats_clusters = random_exclude_feats(
+        args.exclude_feats_parts = random_exclude_feats(
             model.feature_size, args.num_clusters, args.save_dir
         )
         client_fn = get_client_fn(config, args, model)
         strategy = get_fedmultiavg_fn(
             model_parameters,
             args.client_clusters,
-            args.exclude_feats_clusters,
+            args.exclude_feats_parts,
             model.feature_size,
             min_fit_clients=args.num_clients,
             min_evaluate_clients=args.num_clients,
@@ -132,7 +144,7 @@ def main():
         strategy=strategy,
     )
 
-    plot_metrics(history, args.save_dir)
+    plot_metrics(history, args.strategy, args.save_dir)
 
 
 if __name__ == "__main__":

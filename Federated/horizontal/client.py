@@ -30,12 +30,12 @@ class FlowerClient(fl.client.NumPyClient):
         return model_params + ema_params
 
     def set_parameters(self, parameters):
-        model_params = parameters[:self.len_model_params]
+        model_params = parameters[: self.len_model_params]
         params_dict = zip(self.model.state_dict().keys(), model_params)
         state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
         self.model.load_state_dict(state_dict, strict=True)
 
-        ema_params = parameters[self.len_model_params:]
+        ema_params = parameters[self.len_model_params :]
         if ema_params:
             params_dict = zip(self.ema.state_dict().keys(), ema_params)
             state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
@@ -66,11 +66,11 @@ class FlowerClient(fl.client.NumPyClient):
 
         dataset = self.trainer.dataloader_info["dataset"]
         seq_length, feature_dim = dataset.window, dataset.var_num
-        
+
         ori_data = np.load(
             f"{dataset.dir}/{dataset.name}_norm_truth_{seq_length}_train.npy"
         )
-        
+
         fake_data = self.trainer.sample(
             num=len(dataset), size_every=size_every, shape=[seq_length, feature_dim]
         )
@@ -113,9 +113,12 @@ def get_client_fn(config, args, model):
             split_type=args.split_type,
         )
 
-        if hasattr(args, "exclude_feats_clusters"):
-            cluster_id = get_cluster_id(args.client_id, args.client_clusters)
-            args.exclude_feats = args.exclude_feats_clusters[cluster_id]
+        if hasattr(args, "exclude_feats_parts"):
+            if args.strategy == "fedavg":
+                args.exclude_feats = args.exclude_feats_parts[args.client_id]
+            elif args.strategy == "fedmultiavg":
+                cluster_id = get_cluster_id(args.client_id, args.client_clusters)
+                args.exclude_feats = args.exclude_feats_parts[cluster_id]
         else:
             args.exclude_feats = None
 
