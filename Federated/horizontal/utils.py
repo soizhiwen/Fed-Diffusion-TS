@@ -1,3 +1,4 @@
+import math
 import torch
 import pandas as pd
 import numpy as np
@@ -21,7 +22,7 @@ def get_cluster_id(client_id, client_clusters):
     return -1
 
 
-def random_cluster_clients(num_clients, num_clusters, save_dir=None, seed=42):
+def partition_clients(num_clients, num_clusters, save_dir=None, seed=42):
     assert (
         num_clusters <= num_clients
     ), "Number of clusters should be less than number of clients"
@@ -36,36 +37,44 @@ def random_cluster_clients(num_clients, num_clusters, save_dir=None, seed=42):
     return arr
 
 
-def random_exclude_feats(num_feats, num_parts, save_dir=None):
-    if num_parts == 1:
+def partition_features(num_feats, num_partitions, full_ratio=0.2, save_dir=None):
+    if num_partitions == 1:
         return None
 
-    def generate_exclude_feats(seed):
+    def generate_features_group(seed):
         npr.seed(seed)
-        num_exclude_feats = npr.randint(2, num_feats)
-        return npr.choice(num_feats, num_exclude_feats, replace=False)
+        num_gen = npr.randint(2, num_feats)
+        return npr.choice(num_feats, num_gen, replace=False)
 
-    part_exclude_feats = []
-    for cluster in range(num_parts - 1):
-        part_exclude_feats.append(generate_exclude_feats(cluster))
+    num_not_random = 1 if full_ratio == 0 else math.ceil(num_partitions * full_ratio)
 
-    concat_exclude_feats = np.concatenate(part_exclude_feats, axis=0)
-    unique_exclude_feats = np.unique(concat_exclude_feats)
-    not_selected_feats = np.setdiff1d(np.arange(num_feats), unique_exclude_feats)
+    features_groups = []
+    for i in range(num_partitions - num_not_random):
+        features_groups.append(generate_features_group(i))
 
-    if not_selected_feats.size > 0:
-        part_exclude_feats.append(not_selected_feats)
+    if num_not_random == 1:
+        concat = np.concatenate(features_groups, axis=0)
+        unique = np.unique(concat)
+        not_selected_feats = np.setdiff1d(np.arange(num_feats), unique)
+
+        if not_selected_feats.size > 0:
+            features_groups.append(not_selected_feats)
+        else:
+            features_groups.append(generate_features_group(42))
     else:
-        part_exclude_feats.append(generate_exclude_feats(42))
+        for i in range(num_not_random):
+            features_groups.append(np.arange(num_feats))
 
-    part_exclude_feats = [a.tolist() for a in part_exclude_feats]
+    features_groups = [a.tolist() for a in features_groups]
     if save_dir:
-        df = pd.DataFrame(part_exclude_feats, dtype=pd.Int64Dtype())
-        df.to_csv(f"{save_dir}/exclude_feats.csv", header=False, index=False)
-    return part_exclude_feats
+        df = pd.DataFrame(features_groups, dtype=pd.Int64Dtype())
+        df.to_csv(f"{save_dir}/features_groups.csv", header=False, index=False)
+    return features_groups
 
 
-def partition(dataset, nr_clients: int, split_type: str, seed: int) -> List[Subset]:
+def partition_data(
+    dataset, nr_clients: int, split_type: str, seed: int
+) -> List[Subset]:
     rng = npr.default_rng(seed)
     labels = np.array([target for _data, target in dataset])
 
@@ -105,7 +114,7 @@ def partition(dataset, nr_clients: int, split_type: str, seed: int) -> List[Subs
     return [np.take(dataset, split, axis=0) for split in cast(List[List[int]], splits)]
 
 
-def load_partition(
+def load_data_partitions(
     path,
     partition_id,
     nr_clients=5,
@@ -113,15 +122,9 @@ def load_partition(
     seed=42,
 ):
     ds = np.load(path, allow_pickle=True)
-    part_ds = partition(ds, nr_clients, split_type, seed)[partition_id]
+    part_ds = partition_data(ds, nr_clients, split_type, seed)[partition_id]
     part_ds = np.concatenate(part_ds[:, 0])
     return part_ds
-
-
-def load_centralized_data(path):
-    ds = np.load(path, allow_pickle=True)
-    ds = np.concatenate(ds[:, 0])
-    return ds
 
 
 def cal_context_fid(ori_data, fake_data, iterations=5):
