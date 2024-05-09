@@ -45,6 +45,12 @@ def parse_args():
         help="Specifies number of global rounds.",
     )
     parser.add_argument(
+        "--full_ratio",
+        type=float,
+        default=0.2,
+        help="Ratio of clients with full features",
+    )
+    parser.add_argument(
         "--config_file",
         type=str,
         default=None,
@@ -99,10 +105,12 @@ def main():
     args.len_model_params = len(model_parameters)
 
     if args.strategy == "fedavg":
-
         if "missing_ratio" in config["dataloader"]["train_dataset"]["params"]:
             args.features_groups = partition_features(
-                model.feature_size, args.num_clients, args.save_dir
+                model.feature_size,
+                args.num_clients,
+                args.full_ratio,
+                args.save_dir,
             )
 
         client_fn = get_client_fn(config, args, model)

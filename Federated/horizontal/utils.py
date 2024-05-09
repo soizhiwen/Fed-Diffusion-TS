@@ -1,4 +1,5 @@
 import math
+import csv
 import torch
 import pandas as pd
 import numpy as np
@@ -52,7 +53,7 @@ def partition_features(num_feats, num_partitions, full_ratio=0.2, save_dir=None)
     for i in range(num_partitions - num_not_random):
         features_groups.append(generate_features_group(i))
 
-    if num_not_random == 1:
+    if full_ratio == 0:
         concat = np.concatenate(features_groups, axis=0)
         unique = np.unique(concat)
         not_selected_feats = np.setdiff1d(np.arange(num_feats), unique)
@@ -161,33 +162,39 @@ def cal_cross_corr(ori_data, fake_data, iterations=5):
     return mean
 
 
+def write_csv(fields, name, save_dir):
+    with open(f"{save_dir}/{name}.csv", "a") as f:
+        writer = csv.writer(f)
+        writer.writerow(fields)
+
+
 def plot_metrics(history, strategy, save_dir):
     m_name = {
         "train_loss": "Train Loss",
-        "context_fid": "Context-FID Score",
-        "cross_corr": "Correlational Score",
+        "all_context_fid": "Context-FID Score",
+        "all_cross_corr": "Correlational Score",
+        "exist_context_fid": "Context-FID Score",
+        "exist_cross_corr": "Correlational Score",
     }
     metrics = defaultdict(list)
 
     if strategy == "fedavg":
         for m, values in history.metrics_distributed_fit.items():
             for r, v in values:
-                metrics[m_name[m]].append((r, v))
+                metrics[m].append((r, v))
 
         for m, values in history.metrics_distributed.items():
             for r, v in values:
-                metrics[m_name[m]].append((r, v))
-                metrics[m_name[m]].append((r, v))
+                metrics[m].append((r, v))
 
         for k, v in metrics.items():
-            df = pd.DataFrame(v, columns=["Round", k])
-            ax = sns.lineplot(data=df, x="Round", y=k, markers=True, seed=42)
+            df = pd.DataFrame(v, columns=["Round", m_name[k]])
+            ax = sns.lineplot(data=df, x="Round", y=m_name[k], markers=True, seed=42)
             _ = ax.set_xticks(df["Round"].unique())
             _ = ax.set_xlabel("Round")
-            _ = ax.set_ylabel(k)
-            name = k.lower().replace(" ", "_")
-            df.to_csv(f"{save_dir}/{name}.csv", index=False)
-            plt.savefig(f"{save_dir}/{name}.pdf", bbox_inches="tight")
+            _ = ax.set_ylabel(m_name[k])
+            df.to_csv(f"{save_dir}/{k}.csv", index=False)
+            plt.savefig(f"{save_dir}/{k}.pdf", bbox_inches="tight")
             plt.clf()
 
     elif strategy == "fedmultiavg":
@@ -215,3 +222,19 @@ def plot_metrics(history, strategy, save_dir):
             plt.clf()
     else:
         raise NotImplementedError()
+
+    clients_csv = [(f"clients_{k}", k) for k in metrics]
+
+    for csv, k in clients_csv:
+        df = pd.read_csv(f"{save_dir}/{csv}.csv", header=None)
+        df.columns = ["Round", m_name[k], "Client ID"]
+        ax = sns.lineplot(
+            data=df, x="Round", y=m_name[k], hue="Client ID", markers=True, seed=42
+        )
+        sns.move_legend(ax, "upper left", bbox_to_anchor=(1, 1))
+        _ = ax.set_xticks(df["Round"].unique())
+        _ = ax.set_xlabel("Round")
+        _ = ax.set_ylabel(m_name[k])
+        df.to_csv(f"{save_dir}/{csv}.csv", index=False)
+        plt.savefig(f"{save_dir}/{csv}.pdf", bbox_inches="tight")
+        plt.clf()

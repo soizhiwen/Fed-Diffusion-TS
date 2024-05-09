@@ -1,4 +1,5 @@
 import os
+import warnings
 import torch
 import flwr as fl
 import numpy as np
@@ -7,6 +8,7 @@ from collections import OrderedDict
 from Federated.horizontal.utils import (
     get_cluster_id,
     load_data_partitions,
+    write_csv,
     cal_context_fid,
     cal_cross_corr,
 )
@@ -15,6 +17,8 @@ from engine.solver import Trainer
 from Utils.metric_utils import visualization
 from Data.build_dataloader import build_dataloader_fed
 from Models.interpretable_diffusion.model_utils import unnormalize_to_zero_to_one
+
+warnings.filterwarnings("ignore")
 
 
 class FlowerClient(fl.client.NumPyClient):
@@ -47,12 +51,17 @@ class FlowerClient(fl.client.NumPyClient):
         self.set_parameters(parameters)
 
         # Get hyperparameters for this round
+        server_round = config["server_round"]
         self.trainer.train_num_steps = config["local_epochs"]
         train_loss = self.trainer.train()
 
         parameters_prime = self.get_parameters()
         dataset = self.trainer.dataloader_info["dataset"]
         results = {"train_loss": float(train_loss)}
+
+        for k, v in results.items():
+            fields = [server_round, v, self.trainer.args.client_id]
+            write_csv(fields, f"clients_{k}", self.save_dir)
 
         return parameters_prime, len(dataset), results
 
@@ -85,46 +94,59 @@ class FlowerClient(fl.client.NumPyClient):
                 fake_data,
             )
 
-        
+        analysis_types = ["pca", "tsne", "kernel"]
 
-        visualization(
-            ori_data=ori_data,
-            generated_data=fake_data,
-            analysis="pca",
-            compare=ori_data.shape[0],
-            name=f"{dataset.name}_r{server_round}",
-            save_dir=self.save_dir,
-        )
+        exclude_feats = self.trainer.args.exclude_feats
+        # Compute metrics with all features
+        for analysis in analysis_types:
+            visualization(
+                ori_data=ori_data,
+                generated_data=fake_data,
+                analysis=analysis,
+                compare=ori_data.shape[0],
+                name=f"{dataset.name}_r{server_round}_all",
+                save_dir=self.save_dir,
+            )
 
-        visualization(
-            ori_data=ori_data,
-            generated_data=fake_data,
-            analysis="tsne",
-            compare=ori_data.shape[0],
-            name=f"{dataset.name}_r{server_round}",
-            save_dir=self.save_dir,
-        )
-
-        visualization(
-            ori_data=ori_data,
-            generated_data=fake_data,
-            analysis="kernel",
-            compare=ori_data.shape[0],
-            name=f"{dataset.name}_r{server_round}",
-            save_dir=self.save_dir,
-        )
-
-        ctx_fid_mean = cal_context_fid(
+        all_ctx_fid_mean = cal_context_fid(
             ori_data, fake_data, iterations=metric_iterations
         )
-        cross_corr_mean = cal_cross_corr(
+        all_cross_corr_mean = cal_cross_corr(
             ori_data, fake_data, iterations=metric_iterations
         )
 
         metrics = {
-            "context_fid": float(ctx_fid_mean),
-            "cross_corr": float(cross_corr_mean),
+            "all_context_fid": float(all_ctx_fid_mean),
+            "all_cross_corr": float(all_cross_corr_mean),
         }
+
+        # Compute metrics with existing features
+        if exclude_feats:
+            exist_ori_data = ori_data[:, :, exclude_feats]
+            exist_fake_data = fake_data[:, :, exclude_feats]
+
+            for analysis in analysis_types:
+                visualization(
+                    ori_data=exist_ori_data,
+                    generated_data=exist_fake_data,
+                    analysis=analysis,
+                    compare=exist_ori_data.shape[0],
+                    name=f"{dataset.name}_r{server_round}_exist",
+                    save_dir=self.save_dir,
+                )
+
+            exist_ctx_fid_mean = cal_context_fid(
+                exist_ori_data, exist_fake_data, iterations=metric_iterations
+            )
+            exist_cross_corr_mean = cal_cross_corr(
+                exist_ori_data, exist_fake_data, iterations=metric_iterations
+            )
+            metrics["exist_context_fid"] = float(exist_ctx_fid_mean)
+            metrics["exist_cross_corr"] = float(exist_cross_corr_mean)
+
+        for k, v in metrics.items():
+            fields = [server_round, v, self.trainer.args.client_id]
+            write_csv(fields, f"clients_{k}", self.save_dir)
 
         return 0.0, len(dataset), metrics
 
