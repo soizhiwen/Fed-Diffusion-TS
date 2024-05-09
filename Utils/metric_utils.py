@@ -1,4 +1,5 @@
 ## Necessary Packages
+import os
 import scipy.stats
 import numpy as np
 import seaborn as sns
@@ -107,6 +108,9 @@ def visualization(ori_data, generated_data, analysis, compare=3000, name="", sav
     colors = ["red" for i in range(anal_sample_no)] + ["blue" for i in range(anal_sample_no)]
 
     if analysis == 'pca':
+        save_dir = f"{save_dir}/{analysis}"
+        os.makedirs(save_dir, exist_ok=True)
+
         # PCA Analysis
         pca = PCA(n_components=2)
         pca.fit(prep_data)
@@ -124,10 +128,12 @@ def visualization(ori_data, generated_data, analysis, compare=3000, name="", sav
         # plt.title('PCA plot')
         plt.xlabel('x')
         plt.ylabel('y')
-        plt.savefig(f"{save_dir}/pca_{name}.pdf", bbox_inches="tight")
+        plt.savefig(f"{save_dir}/{analysis}_{name}.pdf", bbox_inches="tight")
         # plt.show()
 
     elif analysis == 'tsne':
+        save_dir = f"{save_dir}/{analysis}"
+        os.makedirs(save_dir, exist_ok=True)
 
         # Do t-SNE Analysis together
         prep_data_final = np.concatenate((prep_data, prep_data_hat), axis=0)
@@ -149,11 +155,13 @@ def visualization(ori_data, generated_data, analysis, compare=3000, name="", sav
         # plt.title('t-SNE plot')
         plt.xlabel('x')
         plt.ylabel('y')
-        plt.savefig(f"{save_dir}/tsne_{name}.pdf", bbox_inches="tight")
+        plt.savefig(f"{save_dir}/{analysis}_{name}.pdf", bbox_inches="tight")
         # plt.show()
 
     elif analysis == 'kernel':
-       
+        save_dir = f"{save_dir}/{analysis}"
+        os.makedirs(save_dir, exist_ok=True)
+
         # Visualization parameter
         # colors = ["red" for i in range(anal_sample_no)] + ["blue" for i in range(anal_sample_no)]
 
@@ -170,7 +178,7 @@ def visualization(ori_data, generated_data, analysis, compare=3000, name="", sav
 
         # plt.savefig(str(args.save_dir)+"/"+args.model1+"_histo.png", dpi=100,bbox_inches='tight')
         # plt.ylim((0, 12))
-        plt.savefig(f"{save_dir}/kernel_{name}.pdf", bbox_inches="tight")
+        plt.savefig(f"{save_dir}/{analysis}_{name}.pdf", bbox_inches="tight")
         # plt.show()
         plt.close()
 
