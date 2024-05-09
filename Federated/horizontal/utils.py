@@ -36,8 +36,8 @@ def random_cluster_clients(num_clients, num_clusters, save_dir=None, seed=42):
     return arr
 
 
-def random_exclude_feats(num_feats, num_clusters, save_dir=None):
-    if num_clusters == 1:
+def random_exclude_feats(num_feats, num_parts, save_dir=None):
+    if num_parts == 1:
         return None
 
     def generate_exclude_feats(seed):
@@ -45,24 +45,24 @@ def random_exclude_feats(num_feats, num_clusters, save_dir=None):
         num_exclude_feats = npr.randint(2, num_feats)
         return npr.choice(num_feats, num_exclude_feats, replace=False)
 
-    cluster_exclude_feats = []
-    for cluster in range(num_clusters - 1):
-        cluster_exclude_feats.append(generate_exclude_feats(cluster))
+    part_exclude_feats = []
+    for cluster in range(num_parts - 1):
+        part_exclude_feats.append(generate_exclude_feats(cluster))
 
-    concat_exclude_feats = np.concatenate(cluster_exclude_feats, axis=0)
+    concat_exclude_feats = np.concatenate(part_exclude_feats, axis=0)
     unique_exclude_feats = np.unique(concat_exclude_feats)
     not_selected_feats = np.setdiff1d(np.arange(num_feats), unique_exclude_feats)
 
     if not_selected_feats.size > 0:
-        cluster_exclude_feats.append(not_selected_feats)
+        part_exclude_feats.append(not_selected_feats)
     else:
-        cluster_exclude_feats.append(generate_exclude_feats(42))
+        part_exclude_feats.append(generate_exclude_feats(42))
 
-    cluster_exclude_feats = [a.tolist() for a in cluster_exclude_feats]
+    part_exclude_feats = [a.tolist() for a in part_exclude_feats]
     if save_dir:
-        df = pd.DataFrame(cluster_exclude_feats, dtype=pd.Int64Dtype())
-        df.to_csv(f"{save_dir}/exclude_feats_clusters.csv", header=False, index=False)
-    return cluster_exclude_feats
+        df = pd.DataFrame(part_exclude_feats, dtype=pd.Int64Dtype())
+        df.to_csv(f"{save_dir}/exclude_feats.csv", header=False, index=False)
+    return part_exclude_feats
 
 
 def partition(dataset, nr_clients: int, split_type: str, seed: int) -> List[Subset]:
@@ -158,25 +158,57 @@ def cal_cross_corr(ori_data, fake_data, iterations=5):
     return mean
 
 
-def plot_metrics(history, save_dir):
+def plot_metrics(history, strategy, save_dir):
+    m_name = {
+        "train_loss": "Train Loss",
+        "context_fid": "Context-FID Score",
+        "cross_corr": "Correlational Score",
+    }
     metrics = defaultdict(list)
-    for cluster_id, rounds in history.metrics_distributed_fit.items():
-        for r, m in rounds:
-            metrics["Train Loss"].append((r, m["train_loss"], cluster_id))
 
-    for cluster_id, rounds in history.metrics_distributed.items():
-        for r, m in rounds:
-            metrics["Context-FID Score"].append((r, m["context_fid"], cluster_id))
-            metrics["Correlational Score"].append((r, m["cross_corr"], cluster_id))
+    if strategy == "fedavg":
+        for m, values in history.metrics_distributed_fit.items():
+            for r, v in values:
+                metrics[m_name[m]].append((r, v))
 
-    for k, v in metrics.items():
-        df = pd.DataFrame(v, columns=["Round", k, "Cluster"])
-        ax = sns.lineplot(data=df, x="Round", y=k, hue="Cluster", markers=True, seed=42)
-        sns.move_legend(ax, "upper left", bbox_to_anchor=(1, 1))
-        _ = ax.set_xticks(df["Round"].unique())
-        _ = ax.set_xlabel("Round")
-        _ = ax.set_ylabel(k)
-        name = k.lower().replace(" ", "_")
-        df.to_csv(f"{save_dir}/{name}.csv", index=False)
-        plt.savefig(f"{save_dir}/{name}.pdf", bbox_inches="tight")
-        plt.clf()
+        for m, values in history.metrics_distributed.items():
+            for r, v in values:
+                metrics[m_name[m]].append((r, v))
+                metrics[m_name[m]].append((r, v))
+
+        for k, v in metrics.items():
+            df = pd.DataFrame(v, columns=["Round", k])
+            ax = sns.lineplot(data=df, x="Round", y=k, markers=True, seed=42)
+            _ = ax.set_xticks(df["Round"].unique())
+            _ = ax.set_xlabel("Round")
+            _ = ax.set_ylabel(k)
+            name = k.lower().replace(" ", "_")
+            df.to_csv(f"{save_dir}/{name}.csv", index=False)
+            plt.savefig(f"{save_dir}/{name}.pdf", bbox_inches="tight")
+            plt.clf()
+
+    elif strategy == "fedmultiavg":
+        for cluster_id, rounds in history.metrics_distributed_fit.items():
+            for r, m in rounds:
+                metrics["Train Loss"].append((r, m["train_loss"], cluster_id))
+
+        for cluster_id, rounds in history.metrics_distributed.items():
+            for r, m in rounds:
+                metrics["Context-FID Score"].append((r, m["context_fid"], cluster_id))
+                metrics["Correlational Score"].append((r, m["cross_corr"], cluster_id))
+
+        for k, v in metrics.items():
+            df = pd.DataFrame(v, columns=["Round", k, "Cluster"])
+            ax = sns.lineplot(
+                data=df, x="Round", y=k, hue="Cluster", markers=True, seed=42
+            )
+            sns.move_legend(ax, "upper left", bbox_to_anchor=(1, 1))
+            _ = ax.set_xticks(df["Round"].unique())
+            _ = ax.set_xlabel("Round")
+            _ = ax.set_ylabel(k)
+            name = k.lower().replace(" ", "_")
+            df.to_csv(f"{save_dir}/{name}.csv", index=False)
+            plt.savefig(f"{save_dir}/{name}.pdf", bbox_inches="tight")
+            plt.clf()
+    else:
+        raise NotImplementedError()
