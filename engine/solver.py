@@ -42,6 +42,7 @@ class Trainer(object):
         ema_decay = config['solver']['ema']['decay']
         ema_update_every = config['solver']['ema']['update_interval']
 
+        self.model.exclude_feats = args.exclude_feats
         self.opt = Adam(filter(lambda p: p.requires_grad, self.model.parameters()), lr=start_lr, betas=[0.9, 0.96])
         self.ema = EMA(self.model, beta=ema_decay, update_every=ema_update_every).to(self.device)
 

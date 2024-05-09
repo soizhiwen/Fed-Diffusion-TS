@@ -57,16 +57,18 @@ def parse_args():
         help="Directory to save the results",
     )
     parser.add_argument(
-        "--multi_avg",
-        action="store_true",
-        help="Use FedAvg strategy",
+        "--strategy",
+        type=str,
+        default="fedavg",
+        choices=["fedavg", "fedmultiavg"],
+        help="Strategy to use for federated learning",
     )
     parser.add_argument(
         "--split_type",
         type=str,
         default="balance_label",
-        help="Type of data partitioning",
         choices=["balance_label", "random", "non_iid", "order"],
+        help="Type of data partitioning",
     )
     parser.add_argument(
         "--num_cpus",
@@ -95,26 +97,27 @@ def main():
     model = instantiate_from_config(config["model"]).to(device)
     model_parameters = [val.cpu().numpy() for _, val in model.state_dict().items()]
 
-    if args.multi_avg:
-        client_clusters = random_cluster_clients(
+    if args.strategy == "fedavg":
+        client_fn = get_client_fn(config, args, model)
+        strategy = get_fedavg_fn(model_parameters)
+
+    elif args.strategy == "fedmultiavg":
+        args.client_clusters = random_cluster_clients(
             args.num_clients, args.num_clusters, args.save_dir
         )
-        exclude_feats_clusters = random_exclude_feats(
-            config["model"]["params"]["feature_size"], args.num_clusters, args.save_dir
+        args.exclude_feats_clusters = random_exclude_feats(
+            model.feature_size, args.num_clusters, args.save_dir
         )
-        client_fn = get_client_fn(
-            config, args, model, exclude_feats_clusters, client_clusters
-        )
+        client_fn = get_client_fn(config, args, model)
         strategy = get_fedmultiavg_fn(
             model_parameters,
-            client_clusters,
+            args.client_clusters,
+            args.exclude_feats_clusters,
+            model.feature_size,
             min_fit_clients=args.num_clients,
             min_evaluate_clients=args.num_clients,
             min_available_clients=args.num_clients,
         )
-    else:
-        client_fn = get_client_fn(config, args, model)
-        strategy = get_fedavg_fn(model_parameters)
 
     client_resources = {
         "num_cpus": args.num_cpus,

@@ -96,9 +96,7 @@ class FlowerClient(fl.client.NumPyClient):
         return 0.0, len(dataset), metrics
 
 
-def get_client_fn(
-    config, args, model, exclude_feats_clusters=None, client_clusters=None
-):
+def get_client_fn(config, args, model):
     """Return a function to construct a client.
 
     The VirtualClientEngine will execute this function whenever a client is sampled by
@@ -117,13 +115,13 @@ def get_client_fn(
             split_type=args.split_type,
         )
 
-        exclude_feats = None
-        if exclude_feats_clusters is not None:
-            cluster_id = get_cluster_id(args.client_id, client_clusters)
-            exclude_feats = exclude_feats_clusters[cluster_id]
+        if hasattr(args, "exclude_feats_clusters"):
+            cluster_id = get_cluster_id(args.client_id, args.client_clusters)
+            args.exclude_feats = args.exclude_feats_clusters[cluster_id]
+        else:
+            args.exclude_feats = None
 
-        model.exclude_feats = exclude_feats
-        dataloader_info = build_dataloader_fed(config, dataset, args, exclude_feats)
+        dataloader_info = build_dataloader_fed(config, dataset, args)
         trainer = Trainer(
             config=config,
             args=args,

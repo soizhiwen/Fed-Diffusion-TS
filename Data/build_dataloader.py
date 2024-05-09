@@ -47,13 +47,13 @@ def build_dataloader_cond(config, args=None):
 
     return dataload_info
 
-def build_dataloader_fed(config, data, args=None, exclude_feats=None):
+def build_dataloader_fed(config, data, args=None):
     batch_size = config['dataloader']['batch_size']
     jud = config['dataloader']['shuffle']
     config['dataloader']['train_dataset']['params']['output_dir'] = args.save_dir
     config["dataloader"]["train_dataset"]["params"]["dataset"] = data
     config["dataloader"]["train_dataset"]["params"]["name"] += f"_{args.client_id}"
-    config["dataloader"]["train_dataset"]["params"]["exclude_feats"] = exclude_feats
+    config["dataloader"]["train_dataset"]["params"]["exclude_feats"] = args.exclude_feats
     dataset = instantiate_from_config(config['dataloader']['train_dataset'])
 
     dataloader = torch.utils.data.DataLoader(dataset,
