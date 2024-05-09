@@ -8,8 +8,8 @@ from Federated.horizontal.fedavg import get_fedavg_fn
 from Federated.horizontal.fedmultiavg import get_fedmultiavg_fn
 from Federated.horizontal.client import get_client_fn
 from Federated.horizontal.utils import (
-    random_cluster_clients,
-    random_exclude_feats,
+    partition_clients,
+    partition_features,
     plot_metrics,
 )
 
@@ -101,7 +101,7 @@ def main():
     if args.strategy == "fedavg":
 
         if "missing_ratio" in config["dataloader"]["train_dataset"]["params"]:
-            args.exclude_feats_parts = random_exclude_feats(
+            args.features_groups = partition_features(
                 model.feature_size, args.num_clients, args.save_dir
             )
 
@@ -114,17 +114,17 @@ def main():
         )
 
     elif args.strategy == "fedmultiavg":
-        args.client_clusters = random_cluster_clients(
+        args.client_clusters = partition_clients(
             args.num_clients, args.num_clusters, args.save_dir
         )
-        args.exclude_feats_parts = random_exclude_feats(
+        args.features_groups = partition_features(
             model.feature_size, args.num_clusters, args.save_dir
         )
         client_fn = get_client_fn(config, args, model)
         strategy = get_fedmultiavg_fn(
             model_parameters,
             args.client_clusters,
-            args.exclude_feats_parts,
+            args.features_groups,
             model.feature_size,
             min_fit_clients=args.num_clients,
             min_evaluate_clients=args.num_clients,

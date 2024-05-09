@@ -1,3 +1,4 @@
+import os
 import torch
 import flwr as fl
 import numpy as np
@@ -5,7 +6,7 @@ from collections import OrderedDict
 
 from Federated.horizontal.utils import (
     get_cluster_id,
-    load_partition,
+    load_data_partitions,
     cal_context_fid,
     cal_cross_corr,
 )
@@ -63,6 +64,7 @@ class FlowerClient(fl.client.NumPyClient):
         # Get config values
         size_every = config["size_every"]
         metric_iterations = config["metric_iterations"]
+        server_round = config["server_round"]
 
         dataset = self.trainer.dataloader_info["dataset"]
         seq_length, feature_dim = dataset.window, dataset.var_num
@@ -76,8 +78,41 @@ class FlowerClient(fl.client.NumPyClient):
         )
 
         if dataset.auto_norm:
+            os.makedirs(f"{self.save_dir}/fake", exist_ok=True)
             fake_data = unnormalize_to_zero_to_one(fake_data)
-            np.save(f"{self.save_dir}/ddpm_fake_{dataset.name}.npy", fake_data)
+            np.save(
+                f"{self.save_dir}/fake/ddpm_fake_{dataset.name}_r{server_round}.npy",
+                fake_data,
+            )
+
+        
+
+        visualization(
+            ori_data=ori_data,
+            generated_data=fake_data,
+            analysis="pca",
+            compare=ori_data.shape[0],
+            name=f"{dataset.name}_r{server_round}",
+            save_dir=self.save_dir,
+        )
+
+        visualization(
+            ori_data=ori_data,
+            generated_data=fake_data,
+            analysis="tsne",
+            compare=ori_data.shape[0],
+            name=f"{dataset.name}_r{server_round}",
+            save_dir=self.save_dir,
+        )
+
+        visualization(
+            ori_data=ori_data,
+            generated_data=fake_data,
+            analysis="kernel",
+            compare=ori_data.shape[0],
+            name=f"{dataset.name}_r{server_round}",
+            save_dir=self.save_dir,
+        )
 
         ctx_fid_mean = cal_context_fid(
             ori_data, fake_data, iterations=metric_iterations
@@ -106,19 +141,19 @@ def get_client_fn(config, args, model):
 
         # Get the partition corresponding to the i-th client
         args.client_id = int(cid)
-        dataset = load_partition(
+        dataset = load_data_partitions(
             config["dataloader"]["train_dataset"]["params"]["data_root"],
             args.client_id,
             nr_clients=args.num_clients,
             split_type=args.split_type,
         )
 
-        if hasattr(args, "exclude_feats_parts"):
+        if hasattr(args, "features_groups"):
             if args.strategy == "fedavg":
-                args.exclude_feats = args.exclude_feats_parts[args.client_id]
+                args.exclude_feats = args.features_groups[args.client_id]
             elif args.strategy == "fedmultiavg":
                 cluster_id = get_cluster_id(args.client_id, args.client_clusters)
-                args.exclude_feats = args.exclude_feats_parts[cluster_id]
+                args.exclude_feats = args.features_groups[cluster_id]
         else:
             args.exclude_feats = None
 
