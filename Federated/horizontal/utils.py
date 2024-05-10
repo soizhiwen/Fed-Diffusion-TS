@@ -15,7 +15,13 @@ from Utils.metric_utils import display_scores
 from Utils.cross_correlation import CrossCorrelLoss
 
 
-def partition_features(num_feats, num_partitions, full_ratio=0.2, save_dir=None):
+def partition_features(
+    num_feats,
+    num_partitions,
+    full_ratio=0.2,
+    repeat_prob=0.0,
+    save_dir=None,
+):
     if num_partitions == 1:
         return None
 
@@ -26,10 +32,13 @@ def partition_features(num_feats, num_partitions, full_ratio=0.2, save_dir=None)
 
     num_not_random = 1 if full_ratio == 0 else math.ceil(num_partitions * full_ratio)
 
-    # TODO: Add seed to generate the same features groups
     features_groups = []
     for i in range(num_partitions - num_not_random):
-        features_groups.append(generate_features_group(i))
+        npr.seed(i)
+        if np.random.uniform(0, 1) >= repeat_prob:
+            features_groups.append(generate_features_group(i))
+        else:
+            features_groups.append(generate_features_group(i + 1))
 
     if full_ratio == 0:
         concat = np.concatenate(features_groups, axis=0)
