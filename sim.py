@@ -49,7 +49,7 @@ def parse_args():
         help="Ratio of clients with full features",
     )
     parser.add_argument(
-        "--repeat_prob",
+        "--repeat_thold",
         type=float,
         default=0.0,
         help="Probability of repeating features group",
@@ -113,7 +113,7 @@ def main():
             model.feature_size,
             args.num_clients,
             args.full_ratio,
-            args.repeat_prob,
+            args.repeat_thold,
             args.save_dir,
         )
 

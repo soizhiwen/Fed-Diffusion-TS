@@ -19,7 +19,7 @@ def partition_features(
     num_feats,
     num_partitions,
     full_ratio=0.2,
-    repeat_prob=0.0,
+    repeat_thold=0.0,
     save_dir=None,
 ):
     if num_partitions == 1:
@@ -35,7 +35,7 @@ def partition_features(
     features_groups = []
     for i in range(num_partitions - num_not_random):
         npr.seed(i)
-        if np.random.uniform(0, 1) >= repeat_prob:
+        if np.random.uniform(0, 1) >= repeat_thold:
             features_groups.append(generate_features_group(i))
         else:
             features_groups.append(generate_features_group(i + 1))
