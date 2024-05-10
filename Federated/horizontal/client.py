@@ -28,6 +28,8 @@ class FlowerClient(fl.client.NumPyClient):
         self.ema = trainer.ema
         self.len_model_params = trainer.args.len_model_params
         self.save_dir = trainer.args.save_dir
+        self.client_id = trainer.args.client_id
+        self.exclude_feats = self.trainer.args.exclude_feats
 
     def get_parameters(self):
         model_params = [val.cpu().numpy() for _, val in self.model.state_dict().items()]
@@ -60,7 +62,12 @@ class FlowerClient(fl.client.NumPyClient):
         results = {"train_loss": float(train_loss)}
 
         for k, v in results.items():
-            fields = [server_round, v, self.trainer.args.client_id]
+            cid = (
+                f"{self.client_id} {self.exclude_feats}"
+                if self.exclude_feats
+                else self.client_id
+            )
+            fields = [server_round, v, cid]
             write_csv(fields, f"clients_{k}", self.save_dir)
 
         return parameters_prime, len(dataset), results
@@ -96,7 +103,6 @@ class FlowerClient(fl.client.NumPyClient):
 
         analysis_types = ["pca", "tsne", "kernel"]
 
-        exclude_feats = self.trainer.args.exclude_feats
         # Compute metrics with all features
         for analysis in analysis_types:
             visualization(
@@ -121,9 +127,9 @@ class FlowerClient(fl.client.NumPyClient):
         }
 
         # Compute metrics with existing features
-        if exclude_feats:
-            exist_ori_data = ori_data[:, :, exclude_feats]
-            exist_fake_data = fake_data[:, :, exclude_feats]
+        if self.exclude_feats:
+            exist_ori_data = ori_data[:, :, self.exclude_feats]
+            exist_fake_data = fake_data[:, :, self.exclude_feats]
 
             for analysis in analysis_types:
                 visualization(
@@ -145,7 +151,12 @@ class FlowerClient(fl.client.NumPyClient):
             metrics["exist_cross_corr"] = float(exist_cross_corr_mean)
 
         for k, v in metrics.items():
-            fields = [server_round, v, self.trainer.args.client_id]
+            cid = (
+                f"{self.client_id} {self.exclude_feats}"
+                if self.exclude_feats
+                else self.client_id
+            )
+            fields = [server_round, v, cid]
             write_csv(fields, f"clients_{k}", self.save_dir)
 
         return 0.0, len(dataset), metrics

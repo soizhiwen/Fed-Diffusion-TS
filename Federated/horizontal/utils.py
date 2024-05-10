@@ -228,6 +228,7 @@ def plot_metrics(history, strategy, save_dir):
     for csv, k in clients_csv:
         df = pd.read_csv(f"{save_dir}/{csv}.csv", header=None)
         df.columns = ["Round", m_name[k], "Client ID"]
+        df.sort_values(by=["Client ID", "Round"], inplace=True)
         ax = sns.lineplot(
             data=df, x="Round", y=m_name[k], hue="Client ID", markers=True, seed=42
         )
