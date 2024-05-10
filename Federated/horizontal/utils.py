@@ -15,21 +15,6 @@ from Utils.metric_utils import display_scores
 from Utils.cross_correlation import CrossCorrelLoss
 
 
-def partition_clients(num_clients, num_clusters, save_dir=None, seed=42):
-    assert (
-        num_clusters <= num_clients
-    ), "Number of clusters should be less than number of clients"
-    rng = npr.default_rng(seed)
-    arr = rng.permutation(num_clients)
-    arr = np.array_split(arr, num_clusters)
-    arr = [a.tolist() for a in arr]
-
-    if save_dir:
-        df = pd.DataFrame(arr, dtype=pd.Int64Dtype())
-        df.to_csv(f"{save_dir}/client_clusters.csv", header=False, index=False)
-    return arr
-
-
 def partition_features(num_feats, num_partitions, full_ratio=0.2, save_dir=None):
     if num_partitions == 1:
         return None

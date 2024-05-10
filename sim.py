@@ -9,11 +9,7 @@ from Federated.horizontal.strategy.fedweightedavg import get_fedweightedavg_fn
 from Federated.horizontal.strategy.fednoavg import get_fednoavg_fn
 from Federated.horizontal.strategy.fedhomoavg import get_fedhomoavg_fn
 from Federated.horizontal.client import get_client_fn
-from Federated.horizontal.utils import (
-    partition_clients,
-    partition_features,
-    plot_metrics,
-)
+from Federated.horizontal.utils import partition_features, plot_metrics
 
 from Utils.io_utils import load_yaml_config, instantiate_from_config
 
