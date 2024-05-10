@@ -25,7 +25,7 @@ def weighted_aggregate_inplace(
         num_features = len(exclude_feats)
         # Compute the scaling factor
         scale_1 = fit_res.num_examples / num_examples_total
-        scale_2 = num_features / num_features_total
+        scale_2 = np.exp(num_features) / np.exp(num_features_total)
         scaling_factors.append(scale_1 * scale_2)
 
     # Let's do in-place aggregation
