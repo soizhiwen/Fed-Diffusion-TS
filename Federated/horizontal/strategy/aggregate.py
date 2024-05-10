@@ -9,7 +9,7 @@ from flwr.server.client_proxy import ClientProxy
 
 def weighted_aggregate_inplace(
     results: List[Tuple[ClientProxy, FitRes]],
-    features_groups: List[List[int]],
+    features_groups: List[Tuple[int]],
     num_features_total: int,
 ) -> NDArrays:
     """Compute in-place weighted average."""

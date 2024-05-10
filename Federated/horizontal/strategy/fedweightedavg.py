@@ -20,7 +20,7 @@ from Federated.horizontal.strategy.utils import *
 class FedWeightedAvg(FedAvg):
     def __init__(
         self,
-        features_groups: List[List[int]],
+        features_groups: List[Tuple[int]],
         num_features_total: int,
         *,
         fraction_fit: float = 1.0,
