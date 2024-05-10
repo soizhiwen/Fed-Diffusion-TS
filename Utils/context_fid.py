@@ -25,7 +25,7 @@ def Context_FID(ori_data, generated_data):
     model.fit(ori_data, verbose=False)
     ori_represenation = model.encode(ori_data, encoding_window='full_series')
     gen_represenation = model.encode(generated_data, encoding_window='full_series')
-    idx = np.random.permutation(ori_data.shape[0])
+    idx = np.random.default_rng(42).permutation(ori_data.shape[0])
     ori_represenation = ori_represenation[idx]
     gen_represenation = gen_represenation[idx]
     results = calculate_fid(ori_represenation, gen_represenation)

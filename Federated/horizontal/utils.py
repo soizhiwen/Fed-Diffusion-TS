@@ -128,6 +128,7 @@ def cal_context_fid(ori_data, fake_data, iterations=5):
 
 def cal_cross_corr(ori_data, fake_data, iterations=5):
     def random_choice(size, num_select=100):
+        npr.seed(42)
         select_idx = npr.randint(low=0, high=size, size=(num_select,))
         return select_idx
 
