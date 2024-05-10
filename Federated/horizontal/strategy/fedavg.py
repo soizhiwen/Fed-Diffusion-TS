@@ -1,6 +1,6 @@
 import flwr as fl
 
-from Federated.horizontal.fed_utils import *
+from Federated.horizontal.strategy.utils import *
 
 
 def get_fedavg_fn(

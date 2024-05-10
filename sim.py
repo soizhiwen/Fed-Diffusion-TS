@@ -4,7 +4,7 @@ import argparse
 import torch
 import flwr as fl
 
-from Federated.horizontal.fedavg import get_fedavg_fn
+from Federated.horizontal.strategy.fedavg import get_fedavg_fn
 from Federated.horizontal.fedmultiavg import get_fedmultiavg_fn
 from Federated.horizontal.client import get_client_fn
 from Federated.horizontal.utils import (
