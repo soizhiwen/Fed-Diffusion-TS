@@ -26,6 +26,7 @@ def partition_features(num_feats, num_partitions, full_ratio=0.2, save_dir=None)
 
     num_not_random = 1 if full_ratio == 0 else math.ceil(num_partitions * full_ratio)
 
+    # TODO: Add seed to generate the same features groups
     features_groups = []
     for i in range(num_partitions - num_not_random):
         features_groups.append(generate_features_group(i))
@@ -175,7 +176,6 @@ def plot_metrics(history, strategy, save_dir):
             plt.clf()
 
     elif strategy in ["fednoavg", "fedhomoavg"]:
-        # TODO: compute total average
         for id, rounds in history.metrics_distributed_fit.items():
             for r, m in rounds:
                 metrics["train_loss"].append((r, m["train_loss"], id))
@@ -189,6 +189,7 @@ def plot_metrics(history, strategy, save_dir):
 
         for k, v in metrics.items():
             df = pd.DataFrame(v, columns=["Round", m_name[k], "Cluster ID"])
+            df.sort_values(by=["Cluster ID", "Round"], inplace=True)
             ax = sns.lineplot(
                 data=df, x="Round", y=m_name[k], hue="Cluster ID", marker="o", seed=42
             )
@@ -198,6 +199,17 @@ def plot_metrics(history, strategy, save_dir):
             _ = ax.set_ylabel(m_name[k])
             df.to_csv(f"{save_dir}/{k}.csv", index=False)
             plt.savefig(f"{save_dir}/{k}.pdf", bbox_inches="tight")
+            plt.clf()
+
+            # Compute global average
+            df.drop(columns=["Cluster ID"], inplace=True)
+            df = df.groupby(["Round"], as_index=False).mean()
+            ax = sns.lineplot(data=df, x="Round", y=m_name[k], marker="o", seed=42)
+            _ = ax.set_xticks(df["Round"].unique())
+            _ = ax.set_xlabel("Round")
+            _ = ax.set_ylabel(m_name[k])
+            df.to_csv(f"{save_dir}/avg_{k}.csv", index=False)
+            plt.savefig(f"{save_dir}/avg_{k}.pdf", bbox_inches="tight")
             plt.clf()
 
     else:
