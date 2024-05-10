@@ -49,6 +49,8 @@ dataloader:
       window: 24  # seq_length
       save2npy: True
       neg_one_to_one: True
+      missing_ratio: 1.0
+      mean_mask_length: 0 # Set to 3 if missing ratio < 1.0
       seed: 123
       period: train
 
