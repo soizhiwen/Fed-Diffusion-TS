@@ -182,7 +182,7 @@ def get_client_fn(config, args, model):
         )
 
         if hasattr(args, "features_groups"):
-            if args.strategy == "fedavg":
+            if args.strategy in ["fedavg", "fedweightedavg"]:
                 args.exclude_feats = args.features_groups[args.client_id]
             elif args.strategy == "fedmultiavg":
                 cluster_id = get_cluster_id(args.client_id, args.client_clusters)
