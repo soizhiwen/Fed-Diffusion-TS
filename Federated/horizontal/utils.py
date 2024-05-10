@@ -189,7 +189,7 @@ def plot_metrics(history, strategy, save_dir):
 
         for k, v in metrics.items():
             df = pd.DataFrame(v, columns=["Round", m_name[k]])
-            ax = sns.lineplot(data=df, x="Round", y=m_name[k], markers=True, seed=42)
+            ax = sns.lineplot(data=df, x="Round", y=m_name[k], marker="o", seed=42)
             _ = ax.set_xticks(df["Round"].unique())
             _ = ax.set_xlabel("Round")
             _ = ax.set_ylabel(m_name[k])
@@ -197,29 +197,31 @@ def plot_metrics(history, strategy, save_dir):
             plt.savefig(f"{save_dir}/{k}.pdf", bbox_inches="tight")
             plt.clf()
 
-    elif strategy == "fedmultiavg":
-        for cluster_id, rounds in history.metrics_distributed_fit.items():
+    elif strategy == "fednoavg":
+        for id, rounds in history.metrics_distributed_fit.items():
             for r, m in rounds:
-                metrics["Train Loss"].append((r, m["train_loss"], cluster_id))
+                metrics["train_loss"].append((r, m["train_loss"], id))
 
-        for cluster_id, rounds in history.metrics_distributed.items():
+        for id, rounds in history.metrics_distributed.items():
             for r, m in rounds:
-                metrics["Context-FID Score"].append((r, m["context_fid"], cluster_id))
-                metrics["Correlational Score"].append((r, m["cross_corr"], cluster_id))
+                metrics["all_context_fid"].append((r, m["all_context_fid"], id))
+                metrics["all_cross_corr"].append((r, m["all_cross_corr"], id))
+                metrics["exist_context_fid"].append((r, m["exist_context_fid"], id))
+                metrics["exist_cross_corr"].append((r, m["exist_cross_corr"], id))
 
         for k, v in metrics.items():
-            df = pd.DataFrame(v, columns=["Round", k, "Cluster"])
+            df = pd.DataFrame(v, columns=["Round", m_name[k], "Cluster ID"])
             ax = sns.lineplot(
-                data=df, x="Round", y=k, hue="Cluster", markers=True, seed=42
+                data=df, x="Round", y=m_name[k], hue="Cluster ID", marker="o", seed=42
             )
             sns.move_legend(ax, "upper left", bbox_to_anchor=(1, 1))
             _ = ax.set_xticks(df["Round"].unique())
             _ = ax.set_xlabel("Round")
-            _ = ax.set_ylabel(k)
-            name = k.lower().replace(" ", "_")
-            df.to_csv(f"{save_dir}/{name}.csv", index=False)
-            plt.savefig(f"{save_dir}/{name}.pdf", bbox_inches="tight")
+            _ = ax.set_ylabel(m_name[k])
+            df.to_csv(f"{save_dir}/{k}.csv", index=False)
+            plt.savefig(f"{save_dir}/{k}.pdf", bbox_inches="tight")
             plt.clf()
+
     else:
         raise NotImplementedError()
 
@@ -230,7 +232,7 @@ def plot_metrics(history, strategy, save_dir):
         df.columns = ["Round", m_name[k], "Client ID"]
         df.sort_values(by=["Client ID", "Round"], inplace=True)
         ax = sns.lineplot(
-            data=df, x="Round", y=m_name[k], hue="Client ID", markers=True, seed=42
+            data=df, x="Round", y=m_name[k], hue="Client ID", marker="o", seed=42
         )
         sns.move_legend(ax, "upper left", bbox_to_anchor=(1, 1))
         _ = ax.set_xticks(df["Round"].unique())

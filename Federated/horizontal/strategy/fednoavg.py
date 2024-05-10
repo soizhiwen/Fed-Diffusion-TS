@@ -24,6 +24,7 @@ from Federated.horizontal.strategy.utils import *
 class FedNoAvg(FedAvg):
     def __init__(
         self,
+        num_clients,
         *,
         fraction_fit: float = 1.0,
         fraction_evaluate: float = 1.0,
@@ -57,6 +58,7 @@ class FedNoAvg(FedAvg):
             fit_metrics_aggregation_fn=fit_metrics_aggregation_fn,
             evaluate_metrics_aggregation_fn=evaluate_metrics_aggregation_fn,
         )
+        self.num_clients = num_clients
 
     def __repr__(self) -> str:
         """Compute a string representation of the strategy."""
@@ -65,21 +67,25 @@ class FedNoAvg(FedAvg):
 
     def initialize_parameters(
         self, client_manager: ClientManager
-    ) -> Optional[Parameters]:
+    ) -> Dict[int, Optional[Parameters]]:
         """Initialize global model parameters."""
-        initial_parameters = self.initial_parameters
+        initial_parameters = {}
+        for i in range(self.num_clients):
+            initial_parameters[i] = self.initial_parameters
         self.initial_parameters = None  # Don't keep initial parameters in memory
         return initial_parameters
 
     def configure_fit(
-        self, server_round: int, parameters: Parameters, client_manager: ClientManager
+        self,
+        server_round: int,
+        parameters: Dict[int, Parameters],
+        client_manager: ClientManager,
     ) -> List[Tuple[ClientProxy, FitIns]]:
         """Configure the next round of training."""
         config = {}
         if self.on_fit_config_fn is not None:
             # Custom fit config function provided
             config = self.on_fit_config_fn(server_round)
-        fit_ins = FitIns(parameters, config)
 
         # Sample clients
         sample_size, min_num_clients = self.num_fit_clients(
@@ -89,11 +95,19 @@ class FedNoAvg(FedAvg):
             num_clients=sample_size, min_num_clients=min_num_clients
         )
 
+        client_pairs = []
+        for client in clients:
+            fit_ins = FitIns(parameters[int(client.cid)], config)
+            client_pairs.append((client, fit_ins))
+
         # Return client/config pairs
-        return [(client, fit_ins) for client in clients]
+        return client_pairs
 
     def configure_evaluate(
-        self, server_round: int, parameters: Parameters, client_manager: ClientManager
+        self,
+        server_round: int,
+        parameters: Dict[int, Parameters],
+        client_manager: ClientManager,
     ) -> List[Tuple[ClientProxy, EvaluateIns]]:
         """Configure the next round of evaluation."""
         # Do not configure federated evaluation if fraction eval is 0.
@@ -105,7 +119,6 @@ class FedNoAvg(FedAvg):
         if self.on_evaluate_config_fn is not None:
             # Custom evaluation config function provided
             config = self.on_evaluate_config_fn(server_round)
-        evaluate_ins = EvaluateIns(parameters, config)
 
         # Sample clients
         sample_size, min_num_clients = self.num_evaluation_clients(
@@ -115,15 +128,20 @@ class FedNoAvg(FedAvg):
             num_clients=sample_size, min_num_clients=min_num_clients
         )
 
+        client_pairs = []
+        for client in clients:
+            evaluate_ins = EvaluateIns(parameters[int(client.cid)], config)
+            client_pairs.append((client, evaluate_ins))
+
         # Return client/config pairs
-        return [(client, evaluate_ins) for client in clients]
+        return client_pairs
 
     def aggregate_fit(
         self,
         server_round: int,
         results: List[Tuple[ClientProxy, FitRes]],
         failures: List[Union[Tuple[ClientProxy, FitRes], BaseException]],
-    ) -> Tuple[Optional[Parameters], Dict[str, Scalar]]:
+    ) -> Tuple[Dict[int, Optional[Parameters]], Dict[int, Dict[str, Scalar]]]:
         """Aggregate fit results using weighted average."""
         if not results:
             return None, {}
@@ -132,14 +150,21 @@ class FedNoAvg(FedAvg):
             return None, {}
 
         # Does in-place weighted average of results
-        aggregated_ndarrays = aggregate_inplace(results)
-        parameters_aggregated = ndarrays_to_parameters(aggregated_ndarrays)
+        parameters_aggregated = {}
+        for client, fit_res in results:
+            aggregated_ndarrays = aggregate_inplace([(client, fit_res)])
+            parameters_aggregated[int(client.cid)] = ndarrays_to_parameters(
+                aggregated_ndarrays
+            )
 
         # Aggregate custom metrics if aggregation fn was provided
         metrics_aggregated = {}
         if self.fit_metrics_aggregation_fn:
-            fit_metrics = [(res.num_examples, res.metrics) for _, res in results]
-            metrics_aggregated = self.fit_metrics_aggregation_fn(fit_metrics)
+            for client, fit_res in results:
+                fit_metrics = [(fit_res.num_examples, fit_res.metrics)]
+                metrics_aggregated[int(client.cid)] = self.fit_metrics_aggregation_fn(
+                    fit_metrics
+                )
         elif server_round == 1:  # Only log this warning once
             log(WARNING, "No fit_metrics_aggregation_fn provided")
 
@@ -150,7 +175,7 @@ class FedNoAvg(FedAvg):
         server_round: int,
         results: List[Tuple[ClientProxy, EvaluateRes]],
         failures: List[Union[Tuple[ClientProxy, EvaluateRes], BaseException]],
-    ) -> Tuple[Optional[float], Dict[str, Scalar]]:
+    ) -> Tuple[Dict[int, Optional[float]], Dict[int, Dict[str, Scalar]]]:
         """Aggregate evaluation losses using weighted average."""
         if not results:
             return None, {}
@@ -159,18 +184,19 @@ class FedNoAvg(FedAvg):
             return None, {}
 
         # Aggregate loss
-        loss_aggregated = weighted_loss_avg(
-            [
-                (evaluate_res.num_examples, evaluate_res.loss)
-                for _, evaluate_res in results
-            ]
-        )
+        loss_aggregated = {}
+        for client, evaluate_res in results:
+            loss = [(evaluate_res.num_examples, evaluate_res.loss)]
+            loss_aggregated[int(client.cid)] = weighted_loss_avg(loss)
 
         # Aggregate custom metrics if aggregation fn was provided
         metrics_aggregated = {}
         if self.evaluate_metrics_aggregation_fn:
-            eval_metrics = [(res.num_examples, res.metrics) for _, res in results]
-            metrics_aggregated = self.evaluate_metrics_aggregation_fn(eval_metrics)
+            for client, evaluate_res in results:
+                eval_metrics = [(evaluate_res.num_examples, evaluate_res.metrics)]
+                metrics_aggregated[int(client.cid)] = (
+                    self.evaluate_metrics_aggregation_fn(eval_metrics)
+                )
         elif server_round == 1:  # Only log this warning once
             log(WARNING, "No evaluate_metrics_aggregation_fn provided")
 
@@ -179,6 +205,7 @@ class FedNoAvg(FedAvg):
 
 def get_fednoavg_fn(
     model_parameters,
+    num_clients,
     *,
     fraction_fit=1.0,
     fraction_evaluate=1.0,
@@ -187,6 +214,7 @@ def get_fednoavg_fn(
     min_available_clients=2,
 ):
     strategy = FedNoAvg(
+        num_clients=num_clients,
         fraction_fit=fraction_fit,
         fraction_evaluate=fraction_evaluate,
         min_fit_clients=min_fit_clients,
