@@ -24,7 +24,7 @@ from Federated.horizontal.strategy.utils import *
 class FedNoAvg(FedAvg):
     def __init__(
         self,
-        num_clients,
+        num_clients: int,
         *,
         fraction_fit: float = 1.0,
         fraction_evaluate: float = 1.0,
