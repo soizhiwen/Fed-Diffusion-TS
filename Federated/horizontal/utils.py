@@ -15,14 +15,6 @@ from Utils.metric_utils import display_scores
 from Utils.cross_correlation import CrossCorrelLoss
 
 
-def get_cluster_id(client_id, client_clusters):
-    client_id = int(client_id)
-    for idx, cluster in enumerate(client_clusters):
-        if client_id in cluster:
-            return idx
-    return -1
-
-
 def partition_clients(num_clients, num_clusters, save_dir=None, seed=42):
     assert (
         num_clusters <= num_clients
@@ -66,7 +58,7 @@ def partition_features(num_feats, num_partitions, full_ratio=0.2, save_dir=None)
         for i in range(num_not_random):
             features_groups.append(np.arange(num_feats))
 
-    features_groups = [a.tolist() for a in features_groups]
+    features_groups = [tuple(a) for a in features_groups]
     if save_dir:
         df = pd.DataFrame(features_groups, dtype=pd.Int64Dtype())
         df.to_csv(f"{save_dir}/features_groups.csv", header=False, index=False)
@@ -197,7 +189,8 @@ def plot_metrics(history, strategy, save_dir):
             plt.savefig(f"{save_dir}/{k}.pdf", bbox_inches="tight")
             plt.clf()
 
-    elif strategy == "fednoavg":
+    elif strategy in ["fednoavg", "fedhomoavg"]:
+        # TODO: compute total average
         for id, rounds in history.metrics_distributed_fit.items():
             for r, m in rounds:
                 metrics["train_loss"].append((r, m["train_loss"], id))

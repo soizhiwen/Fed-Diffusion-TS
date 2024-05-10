@@ -6,7 +6,6 @@ import numpy as np
 from collections import OrderedDict
 
 from Federated.horizontal.utils import (
-    get_cluster_id,
     load_data_partitions,
     write_csv,
     cal_context_fid,
@@ -182,11 +181,7 @@ def get_client_fn(config, args, model):
         )
 
         if hasattr(args, "features_groups"):
-            if args.strategy in ["fedavg", "fedweightedavg", "fednoavg"]:
-                args.exclude_feats = args.features_groups[args.client_id]
-            elif args.strategy == "fedmultiavg":
-                cluster_id = get_cluster_id(args.client_id, args.client_clusters)
-                args.exclude_feats = args.features_groups[cluster_id]
+            args.exclude_feats = args.features_groups[args.client_id]
         else:
             args.exclude_feats = None
 

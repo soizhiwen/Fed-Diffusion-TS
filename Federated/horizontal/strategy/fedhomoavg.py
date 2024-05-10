@@ -1,5 +1,6 @@
+from collections import defaultdict
 from logging import WARNING
-from typing import Callable, Dict, List, Optional, Tuple, Union
+from typing import Callable, Dict, List, Optional, Tuple, Union, Any
 
 from flwr.common import (
     EvaluateIns,
@@ -24,7 +25,7 @@ from Federated.horizontal.strategy.utils import *
 class FedHomoAvg(FedAvg):
     def __init__(
         self,
-        num_clients,
+        features_groups: List[Tuple[int]],
         *,
         fraction_fit: float = 1.0,
         fraction_evaluate: float = 1.0,
@@ -58,27 +59,36 @@ class FedHomoAvg(FedAvg):
             fit_metrics_aggregation_fn=fit_metrics_aggregation_fn,
             evaluate_metrics_aggregation_fn=evaluate_metrics_aggregation_fn,
         )
-        self.num_clients = num_clients
+        self.features_groups = features_groups
 
     def __repr__(self) -> str:
         """Compute a string representation of the strategy."""
         rep = f"FedHomoAvg(accept_failures={self.accept_failures})"
         return rep
 
+    def cluster_clients(
+        self, results: List[Tuple[ClientProxy, Any]]
+    ) -> Dict[Tuple, List[Tuple[ClientProxy, Any]]]:
+        clustered_clients = defaultdict(list)
+        for client, res in results:
+            features = self.features_groups[int(client.cid)]
+            clustered_clients[features].append((client, res))
+        return clustered_clients
+
     def initialize_parameters(
         self, client_manager: ClientManager
-    ) -> Dict[int, Optional[Parameters]]:
+    ) -> Dict[Tuple[int], Optional[Parameters]]:
         """Initialize global model parameters."""
         initial_parameters = {}
-        for i in range(self.num_clients):
-            initial_parameters[i] = self.initial_parameters
+        for features in set(self.features_groups):
+            initial_parameters[features] = self.initial_parameters
         self.initial_parameters = None  # Don't keep initial parameters in memory
         return initial_parameters
 
     def configure_fit(
         self,
         server_round: int,
-        parameters: Dict[int, Parameters],
+        parameters: Dict[Tuple[int], Parameters],
         client_manager: ClientManager,
     ) -> List[Tuple[ClientProxy, FitIns]]:
         """Configure the next round of training."""
@@ -97,7 +107,8 @@ class FedHomoAvg(FedAvg):
 
         client_pairs = []
         for client in clients:
-            fit_ins = FitIns(parameters[int(client.cid)], config)
+            features = self.features_groups[int(client.cid)]
+            fit_ins = FitIns(parameters[features], config)
             client_pairs.append((client, fit_ins))
 
         # Return client/config pairs
@@ -106,7 +117,7 @@ class FedHomoAvg(FedAvg):
     def configure_evaluate(
         self,
         server_round: int,
-        parameters: Dict[int, Parameters],
+        parameters: Dict[Tuple[int], Parameters],
         client_manager: ClientManager,
     ) -> List[Tuple[ClientProxy, EvaluateIns]]:
         """Configure the next round of evaluation."""
@@ -130,7 +141,8 @@ class FedHomoAvg(FedAvg):
 
         client_pairs = []
         for client in clients:
-            evaluate_ins = EvaluateIns(parameters[int(client.cid)], config)
+            features = self.features_groups[int(client.cid)]
+            evaluate_ins = EvaluateIns(parameters[features], config)
             client_pairs.append((client, evaluate_ins))
 
         # Return client/config pairs
@@ -141,7 +153,7 @@ class FedHomoAvg(FedAvg):
         server_round: int,
         results: List[Tuple[ClientProxy, FitRes]],
         failures: List[Union[Tuple[ClientProxy, FitRes], BaseException]],
-    ) -> Tuple[Dict[int, Optional[Parameters]], Dict[int, Dict[str, Scalar]]]:
+    ) -> Tuple[Dict[Tuple[int], Optional[Parameters]], Dict[Tuple[int], Dict[str, Scalar]]]:
         """Aggregate fit results using weighted average."""
         if not results:
             return None, {}
@@ -149,22 +161,20 @@ class FedHomoAvg(FedAvg):
         if not self.accept_failures and failures:
             return None, {}
 
+        clustered_clients = self.cluster_clients(results)
+
         # Does in-place weighted average of results
         parameters_aggregated = {}
-        for client, fit_res in results:
-            aggregated_ndarrays = aggregate_inplace([(client, fit_res)])
-            parameters_aggregated[int(client.cid)] = ndarrays_to_parameters(
-                aggregated_ndarrays
-            )
+        for k, v in clustered_clients.items():
+            aggregated_ndarrays = aggregate_inplace(v)
+            parameters_aggregated[k] = ndarrays_to_parameters(aggregated_ndarrays)
 
         # Aggregate custom metrics if aggregation fn was provided
         metrics_aggregated = {}
         if self.fit_metrics_aggregation_fn:
-            for client, fit_res in results:
-                fit_metrics = [(fit_res.num_examples, fit_res.metrics)]
-                metrics_aggregated[int(client.cid)] = self.fit_metrics_aggregation_fn(
-                    fit_metrics
-                )
+            for k, v in clustered_clients.items():
+                fit_metrics = [(res.num_examples, res.metrics) for _, res in v]
+                metrics_aggregated[k] = self.fit_metrics_aggregation_fn(fit_metrics)
         elif server_round == 1:  # Only log this warning once
             log(WARNING, "No fit_metrics_aggregation_fn provided")
 
@@ -175,7 +185,7 @@ class FedHomoAvg(FedAvg):
         server_round: int,
         results: List[Tuple[ClientProxy, EvaluateRes]],
         failures: List[Union[Tuple[ClientProxy, EvaluateRes], BaseException]],
-    ) -> Tuple[Dict[int, Optional[float]], Dict[int, Dict[str, Scalar]]]:
+    ) -> Tuple[Dict[Tuple[int], Optional[float]], Dict[Tuple[int], Dict[str, Scalar]]]:
         """Aggregate evaluation losses using weighted average."""
         if not results:
             return None, {}
@@ -183,19 +193,21 @@ class FedHomoAvg(FedAvg):
         if not self.accept_failures and failures:
             return None, {}
 
+        clustered_clients = self.cluster_clients(results)
+
         # Aggregate loss
         loss_aggregated = {}
-        for client, evaluate_res in results:
-            loss = [(evaluate_res.num_examples, evaluate_res.loss)]
-            loss_aggregated[int(client.cid)] = weighted_loss_avg(loss)
+        for k, v in clustered_clients.items():
+            loss = [(res.num_examples, res.loss) for _, res in v]
+            loss_aggregated[k] = weighted_loss_avg(loss)
 
         # Aggregate custom metrics if aggregation fn was provided
         metrics_aggregated = {}
         if self.evaluate_metrics_aggregation_fn:
-            for client, evaluate_res in results:
-                eval_metrics = [(evaluate_res.num_examples, evaluate_res.metrics)]
-                metrics_aggregated[int(client.cid)] = (
-                    self.evaluate_metrics_aggregation_fn(eval_metrics)
+            for k, v in clustered_clients.items():
+                eval_metrics = [(res.num_examples, res.metrics) for _, res in v]
+                metrics_aggregated[k] = self.evaluate_metrics_aggregation_fn(
+                    eval_metrics
                 )
         elif server_round == 1:  # Only log this warning once
             log(WARNING, "No evaluate_metrics_aggregation_fn provided")
@@ -205,7 +217,7 @@ class FedHomoAvg(FedAvg):
 
 def get_fedhomoavg_fn(
     model_parameters,
-    num_clients,
+    features_groups,
     *,
     fraction_fit=1.0,
     fraction_evaluate=1.0,
@@ -214,7 +226,7 @@ def get_fedhomoavg_fn(
     min_available_clients=2,
 ):
     strategy = FedHomoAvg(
-        num_clients=num_clients,
+        features_groups=features_groups,
         fraction_fit=fraction_fit,
         fraction_evaluate=fraction_evaluate,
         min_fit_clients=min_fit_clients,
