@@ -22,7 +22,7 @@ def parse_args():
     parser.add_argument(
         "--name",
         type=str,
-        default=None,
+        default="exp",
         help="Name of the experiment",
     )
     parser.add_argument(
