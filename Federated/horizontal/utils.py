@@ -1,3 +1,4 @@
+import os
 import math
 import csv
 import torch
@@ -6,6 +7,7 @@ import numpy as np
 import numpy.random as npr
 import seaborn as sns
 import matplotlib.pyplot as plt
+from pathlib import Path
 from typing import List, cast
 from collections import defaultdict
 from torch.utils.data import Subset
@@ -241,3 +243,28 @@ def plot_metrics(history, strategy, save_dir):
         df.to_csv(f"{save_dir}/{csv}.csv", index=False)
         plt.savefig(f"{save_dir}/{csv}.pdf", bbox_inches="tight")
         plt.clf()
+
+
+def increment_path(path, exist_ok=False, sep="", mkdir=False):
+    """
+    Generates an incremented file or directory path if it exists, with optional mkdir; args: path, exist_ok=False,
+    sep="", mkdir=False.
+
+    Example: runs/exp --> runs/exp{sep}2, runs/exp{sep}3, ... etc
+    """
+    path = Path(path)
+    if path.exists() and not exist_ok:
+        path, suffix = (
+            (path.with_suffix(""), path.suffix) if path.is_file() else (path, "")
+        )
+
+        for n in range(2, 9999):
+            p = f"{path}{sep}{n}{suffix}"
+            if not os.path.exists(p):
+                break
+        path = Path(p)
+
+    if mkdir:
+        path.mkdir(parents=True, exist_ok=True)
+
+    return path.as_posix()

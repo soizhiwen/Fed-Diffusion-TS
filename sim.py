@@ -1,4 +1,4 @@
-import os
+import json
 import warnings
 import argparse
 import torch
@@ -10,7 +10,7 @@ from Federated.horizontal.strategy.fednoavg import get_fednoavg_fn
 from Federated.horizontal.strategy.fedhomoavg import get_fedhomoavg_fn
 from Federated.horizontal.strategy.feddynaavg import get_feddynaavg_fn
 from Federated.horizontal.client import get_client_fn
-from Federated.horizontal.utils import partition_features, plot_metrics
+from Federated.horizontal.utils import partition_features, plot_metrics, increment_path
 
 from Utils.io_utils import load_yaml_config, instantiate_from_config
 
@@ -95,8 +95,11 @@ def parse_args():
     )
 
     args = parser.parse_args()
-    args.save_dir = os.path.join(args.output, f"{args.name}")
-    os.makedirs(args.save_dir, exist_ok=True)
+    args.save_dir = increment_path(f"{args.output}/{args.name}", sep="_", mkdir=True)
+
+    with open(f"{args.save_dir}/args.json", "w") as f:
+        json.dump(args.__dict__, f, indent=2)
+
     return args
 
 
