@@ -180,7 +180,8 @@ def visualization(ori_data, generated_data, analysis, compare=3000, name="", sav
         # plt.ylim((0, 12))
         plt.savefig(f"{save_dir}/{analysis}_{name}.pdf", bbox_inches="tight")
         # plt.show()
-        plt.close()
+        # plt.close()
+    plt.clf()
 
 
 if __name__ == '__main__':
