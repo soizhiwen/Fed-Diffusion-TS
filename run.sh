@@ -3,45 +3,41 @@
 ###############################################################################
 
 # FedAvg without mask
-python sim.py --name exp --num_clients 10 \
-    --num_rounds 10 --split_type balance_label \
+python sim.py --num_clients 10 --num_rounds 10 \
+    --split_type balance_label --strategy fedavg \
     --config_file ./Config/stocks_hfl.yaml \
-    --num_cpus 6 --num_gpus 0.3 --strategy fedavg
+    --num_cpus 6 --num_gpus 0.3
 
 # FedAvg with mask
-python sim.py --name exp --num_clients 10 \
-    --full_ratio 0.2 --num_rounds 10 \
-    --split_type balance_label \
+python sim.py --num_clients --num_rounds 10 \
+    --split_type balance_label --strategy fedavg \
     --config_file ./Config/stocks_hfl_mask.yaml \
-    --num_cpus 6 --num_gpus 0.3 --strategy fedavg
+    --full_ratio 0.2 --num_cpus 6 --num_gpus 0.3
 
 # FedWeightedAvg
-python sim.py --name exp --num_clients 10 \
-    --full_ratio 0.2 --num_rounds 10 \
-    --split_type balance_label \
+python sim.py --num_clients 10 --num_rounds 10 \
+    --split_type balance_label --strategy fedweightedavg \
     --config_file ./Config/stocks_hfl_mask.yaml \
-    --num_cpus 6 --num_gpus 0.3 --strategy fedweightedavg
+    --full_ratio 0.2 --num_cpus 6 --num_gpus 0.3
 
 # FedNoAvg
-python sim.py --name exp --num_clients 10 \
-    --full_ratio 0.2 --num_rounds 10 \
-    --split_type balance_label \
+python sim.py --num_clients 10 --num_rounds 10 \
+    --split_type balance_label --strategy fednoavg \
     --config_file ./Config/stocks_hfl_mask.yaml \
-    --num_cpus 6 --num_gpus 0.3 --strategy fednoavg
+    --full_ratio 0.2 --num_cpus 6 --num_gpus 0.3
 
 # FedHomoAvg
-python sim.py --name exp --num_clients 10 \
-    --full_ratio 0.2 --repeat_thold 0.5 \
-    --num_rounds 10 --split_type balance_label \
+python sim.py --num_clients 10 --num_rounds 10 \
+    --split_type balance_label --strategy fedhomoavg \
     --config_file ./Config/stocks_hfl_mask.yaml \
-    --num_cpus 6 --num_gpus 0.3 --strategy fedhomoavg
+    --full_ratio 0.2 --repeat_thold 0.5 \
+    --num_cpus 6 --num_gpus 0.3
 
 # FedDynaAvg
-python sim.py --name exp --num_clients 10 \
-    --full_ratio 0.2 --num_rounds 10 \
-    --split_type balance_label \
+python sim.py --num_clients 10 --num_rounds 10 \
+    --split_type balance_label --strategy feddynaavg \
     --config_file ./Config/stocks_hfl_mask.yaml \
-    --num_cpus 6 --num_gpus 0.3 --strategy feddynaavg
+    --full_ratio 0.2 --num_cpus 6 --num_gpus 0.3
 
 
 ###############################################################################
@@ -49,42 +45,38 @@ python sim.py --name exp --num_clients 10 \
 ###############################################################################
 
 # FedAvg without mask
-python sim.py --name exp --num_clients 10 \
-    --num_rounds 10 --split_type balance_label \
+python sim.py --num_clients 10 --num_rounds 10 \
+    --split_type balance_label --strategy fedavg \
     --config_file ./Config/energy_hfl.yaml \
-    --num_cpus 6 --num_gpus 0.3 --strategy fedavg
+    --num_cpus 6 --num_gpus 0.3
 
 # FedAvg with mask
-python sim.py --name exp --num_clients 10 \
-    --full_ratio 0.2 --num_rounds 10 \
-    --split_type balance_label \
+python sim.py --num_clients --num_rounds 10 \
+    --split_type balance_label --strategy fedavg \
     --config_file ./Config/energy_hfl_mask.yaml \
-    --num_cpus 6 --num_gpus 0.3 --strategy fedavg
+    --full_ratio 0.2 --num_cpus 6 --num_gpus 0.3
 
 # FedWeightedAvg
-python sim.py --name exp --num_clients 10 \
-    --full_ratio 0.2 --num_rounds 10 \
-    --split_type balance_label \
+python sim.py --num_clients 10 --num_rounds 10 \
+    --split_type balance_label --strategy fedweightedavg \
     --config_file ./Config/energy_hfl_mask.yaml \
-    --num_cpus 6 --num_gpus 0.3 --strategy fedweightedavg
+    --full_ratio 0.2 --num_cpus 6 --num_gpus 0.3
 
 # FedNoAvg
-python sim.py --name exp --num_clients 10 \
-    --full_ratio 0.2 --num_rounds 10 \
-    --split_type balance_label \
+python sim.py --num_clients 10 --num_rounds 10 \
+    --split_type balance_label --strategy fednoavg \
     --config_file ./Config/energy_hfl_mask.yaml \
-    --num_cpus 6 --num_gpus 0.3 --strategy fednoavg
+    --full_ratio 0.2 --num_cpus 6 --num_gpus 0.3
 
 # FedHomoAvg
-python sim.py --name exp --num_clients 10 \
-    --full_ratio 0.2 --repeat_thold 0.5 \
-    --num_rounds 10 --split_type balance_label \
+python sim.py --num_clients 10 --num_rounds 10 \
+    --split_type balance_label --strategy fedhomoavg \
     --config_file ./Config/energy_hfl_mask.yaml \
-    --num_cpus 6 --num_gpus 0.3 --strategy fedhomoavg
+    --full_ratio 0.2 --repeat_thold 0.5 \
+    --num_cpus 6 --num_gpus 0.3
 
 # FedDynaAvg
-python sim.py --name exp --num_clients 10 \
-    --full_ratio 0.2 --num_rounds 10 \
-    --split_type balance_label \
+python sim.py --num_clients 10 --num_rounds 10 \
+    --split_type balance_label --strategy feddynaavg \
     --config_file ./Config/energy_hfl_mask.yaml \
-    --num_cpus 6 --num_gpus 0.3 --strategy feddynaavg
+    --full_ratio 0.2 --num_cpus 6 --num_gpus 0.3
