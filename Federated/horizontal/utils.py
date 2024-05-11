@@ -166,7 +166,7 @@ def plot_metrics(history, strategy, save_dir):
     }
     metrics = defaultdict(list)
 
-    if strategy in ["fedavg", "fedweightedavg"]:
+    if strategy in ["fedavg", "fedweightedavg", "feddynaavg"]:
         for m, values in history.metrics_distributed_fit.items():
             for r, v in values:
                 metrics[m].append((r, v))
