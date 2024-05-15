@@ -1,3 +1,9 @@
+"""
+python label_data.py --csv_file ~/Fed-Diffusion-TS/Data/datasets/stock_data.csv --num_clusters 5
+python label_data.py --csv_file ~/Fed-Diffusion-TS/Data/datasets/energy_data.csv --num_clusters 6
+python label_data.py --csv_file ~/Fed-Diffusion-TS/Data/datasets/ETTh.csv --num_clusters 6 --drop_first
+"""
+
 import argparse
 import pandas as pd
 import numpy as np
@@ -6,8 +12,11 @@ from sklearn.cluster import KMeans
 from sklearn.preprocessing import MinMaxScaler
 
 
-def label_data(path, window_size=24, n_clusters=5, step_size=1):
+def label_data(path, window_size=24, n_clusters=5, step_size=1, drop_first=False):
     data = pd.read_csv(path)
+    if drop_first:
+        data.drop(data.columns[0], axis=1, inplace=True)
+
     subsets = [
         data.iloc[i : i + window_size].values
         for i in range(0, len(data) - window_size + 1, step_size)
@@ -46,6 +55,12 @@ if __name__ == "__main__":
         default=1,
         help="Step size for labeling data",
     )
+    parser.add_argument(
+        "--drop_first",
+        action="store_true",
+        default=False,
+        help="Drop the first column of the dataset",
+    )
     args = parser.parse_args()
 
     dataset = label_data(
@@ -53,6 +68,7 @@ if __name__ == "__main__":
         window_size=args.window_size,
         n_clusters=args.num_clusters,
         step_size=args.step_size,
+        drop_first=args.drop_first,
     )
     dataset = np.array(dataset, dtype=object)
     path = Path(args.csv_file)
