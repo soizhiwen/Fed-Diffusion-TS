@@ -12,8 +12,8 @@ from flwr.common import (
 from flwr.common.logger import log
 from flwr.server.client_proxy import ClientProxy
 from flwr.server.strategy.fedavg import FedAvg
+from flwr.server.strategy.aggregate import aggregate_inplace
 
-from Federated.horizontal.strategy.aggregate import weighted_aggregate_inplace
 from Federated.horizontal.strategy.utils import *
 
 
@@ -56,7 +56,6 @@ class FedDynaAvg(FedAvg):
             fit_metrics_aggregation_fn=fit_metrics_aggregation_fn,
             evaluate_metrics_aggregation_fn=evaluate_metrics_aggregation_fn,
         )
-        self.features_groups = features_groups
         self.num_features_total = num_features_total
         self.num_rounds = num_rounds
 
@@ -101,9 +100,7 @@ class FedDynaAvg(FedAvg):
                 top_k_results.append((client, fit_res))
 
         # Does in-place weighted average of results
-        aggregated_ndarrays = weighted_aggregate_inplace(
-            top_k_results, self.features_groups, self.num_features_total
-        )
+        aggregated_ndarrays = aggregate_inplace(top_k_results)
         parameters_aggregated = ndarrays_to_parameters(aggregated_ndarrays)
 
         # Aggregate custom metrics if aggregation fn was provided
