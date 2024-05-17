@@ -2,6 +2,8 @@ from logging import WARNING
 from typing import Callable, Dict, List, Optional, Tuple, Union
 
 from flwr.common import (
+    EvaluateRes,
+    FitIns,
     FitRes,
     MetricsAggregationFn,
     NDArrays,
@@ -10,14 +12,15 @@ from flwr.common import (
     ndarrays_to_parameters,
 )
 from flwr.common.logger import log
+from flwr.server.client_manager import ClientManager
 from flwr.server.client_proxy import ClientProxy
 from flwr.server.strategy.fedavg import FedAvg
-from flwr.server.strategy.aggregate import aggregate_inplace
+from flwr.server.strategy.aggregate import aggregate_inplace, weighted_loss_avg
 
 from Federated.horizontal.strategy.utils import *
 
 
-class FedTSMDynaAvg(FedAvg):
+class FedTSM(FedAvg):
     def __init__(
         self,
         features_groups: List[Tuple[int]],
@@ -66,8 +69,29 @@ class FedTSMDynaAvg(FedAvg):
 
     def __repr__(self) -> str:
         """Compute a string representation of the strategy."""
-        rep = f"FedTSMDynaAvg(accept_failures={self.accept_failures})"
+        rep = f"FedTSM(accept_failures={self.accept_failures})"
         return rep
+
+    def configure_fit(
+        self, server_round: int, parameters: Parameters, client_manager: ClientManager
+    ) -> List[Tuple[ClientProxy, FitIns]]:
+        """Configure the next round of training."""
+        config = {}
+        if self.on_fit_config_fn is not None:
+            # Custom fit config function provided
+            config = self.on_fit_config_fn(server_round)
+        fit_ins = FitIns(parameters, config)
+
+        # Sample clients
+        sample_size, min_num_clients = self.num_fit_clients(
+            client_manager.num_available()
+        )
+        clients = client_manager.sample(
+            num_clients=sample_size, min_num_clients=min_num_clients
+        )
+
+        # Return client/config pairs
+        return [(client, fit_ins) for client in clients]
 
     def aggregate_fit(
         self,
@@ -82,25 +106,8 @@ class FedTSMDynaAvg(FedAvg):
         if not self.accept_failures and failures:
             return None, {}
 
-        k = (1 - (server_round / self.num_rounds)) * self.num_features_total
-        top_k_clients = []
-        for len_group, client_id in self.sorted_len_feats_groups:
-            if len_group >= k:
-                top_k_clients.append(client_id)
-            else:
-                break
-
-        if not top_k_clients:
-            first_client = self.sorted_len_feats_groups[0][1]
-            top_k_clients.append(first_client)
-
-        top_k_results = []
-        for client, fit_res in results:
-            if int(client.cid) in top_k_clients:
-                top_k_results.append((client, fit_res))
-
         # Does in-place weighted average of results
-        aggregated_ndarrays = aggregate_inplace(top_k_results)
+        aggregated_ndarrays = aggregate_inplace(results)
         parameters_aggregated = ndarrays_to_parameters(aggregated_ndarrays)
 
         # Aggregate custom metrics if aggregation fn was provided
@@ -113,8 +120,39 @@ class FedTSMDynaAvg(FedAvg):
 
         return parameters_aggregated, metrics_aggregated
 
+    def aggregate_evaluate(
+        self,
+        server_round: int,
+        results: List[Tuple[ClientProxy, EvaluateRes]],
+        failures: List[Union[Tuple[ClientProxy, EvaluateRes], BaseException]],
+    ) -> Tuple[Optional[float], Dict[str, Scalar]]:
+        """Aggregate evaluation losses using weighted average."""
+        if not results:
+            return None, {}
+        # Do not aggregate if there are failures and failures are not accepted
+        if not self.accept_failures and failures:
+            return None, {}
 
-def get_fedtsmdynaavg_fn(
+        # Aggregate loss
+        loss_aggregated = weighted_loss_avg(
+            [
+                (evaluate_res.num_examples, evaluate_res.loss)
+                for _, evaluate_res in results
+            ]
+        )
+
+        # Aggregate custom metrics if aggregation fn was provided
+        metrics_aggregated = {}
+        if self.evaluate_metrics_aggregation_fn:
+            eval_metrics = [(res.num_examples, res.metrics) for _, res in results]
+            metrics_aggregated = self.evaluate_metrics_aggregation_fn(eval_metrics)
+        elif server_round == 1:  # Only log this warning once
+            log(WARNING, "No evaluate_metrics_aggregation_fn provided")
+
+        return loss_aggregated, metrics_aggregated
+
+
+def get_fedtsm_fn(
     model_parameters,
     features_groups,
     num_features_total,
@@ -126,7 +164,7 @@ def get_fedtsmdynaavg_fn(
     min_evaluate_clients=2,
     min_available_clients=2,
 ):
-    strategy = FedTSMDynaAvg(
+    strategy = FedTSM(
         features_groups=features_groups,
         num_features_total=num_features_total,
         num_rounds=num_rounds,
