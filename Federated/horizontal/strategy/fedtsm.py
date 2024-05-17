@@ -2,6 +2,7 @@ from logging import WARNING
 from typing import Callable, Dict, List, Optional, Tuple, Union
 
 from flwr.common import (
+    EvaluateIns,
     EvaluateRes,
     FitIns,
     FitRes,
@@ -24,8 +25,6 @@ class FedTSM(FedAvg):
     def __init__(
         self,
         features_groups: List[Tuple[int]],
-        num_features_total: int,
-        num_rounds: int,
         *,
         fraction_fit: float = 1.0,
         fraction_evaluate: float = 1.0,
@@ -59,13 +58,7 @@ class FedTSM(FedAvg):
             fit_metrics_aggregation_fn=fit_metrics_aggregation_fn,
             evaluate_metrics_aggregation_fn=evaluate_metrics_aggregation_fn,
         )
-        self.num_features_total = num_features_total
-        self.num_rounds = num_rounds
-
-        len_feats_groups = []
-        for idx, group in enumerate(features_groups):
-            len_feats_groups.append((len(group), idx))
-        self.sorted_len_feats_groups = sorted(len_feats_groups, reverse=True)
+        self.features_groups = features_groups
 
     def __repr__(self) -> str:
         """Compute a string representation of the strategy."""
@@ -92,6 +85,32 @@ class FedTSM(FedAvg):
 
         # Return client/config pairs
         return [(client, fit_ins) for client in clients]
+
+    def configure_evaluate(
+        self, server_round: int, parameters: Parameters, client_manager: ClientManager
+    ) -> List[Tuple[ClientProxy, EvaluateIns]]:
+        """Configure the next round of evaluation."""
+        # Do not configure federated evaluation if fraction eval is 0.
+        if self.fraction_evaluate == 0.0:
+            return []
+
+        # Parameters and config
+        config = {}
+        if self.on_evaluate_config_fn is not None:
+            # Custom evaluation config function provided
+            config = self.on_evaluate_config_fn(server_round)
+        evaluate_ins = EvaluateIns(parameters, config)
+
+        # Sample clients
+        sample_size, min_num_clients = self.num_evaluation_clients(
+            client_manager.num_available()
+        )
+        clients = client_manager.sample(
+            num_clients=sample_size, min_num_clients=min_num_clients
+        )
+
+        # Return client/config pairs
+        return [(client, evaluate_ins) for client in clients]
 
     def aggregate_fit(
         self,
@@ -155,8 +174,6 @@ class FedTSM(FedAvg):
 def get_fedtsm_fn(
     model_parameters,
     features_groups,
-    num_features_total,
-    num_rounds,
     *,
     fraction_fit=1.0,
     fraction_evaluate=1.0,
@@ -166,8 +183,6 @@ def get_fedtsm_fn(
 ):
     strategy = FedTSM(
         features_groups=features_groups,
-        num_features_total=num_features_total,
-        num_rounds=num_rounds,
         fraction_fit=fraction_fit,
         fraction_evaluate=fraction_evaluate,
         min_fit_clients=min_fit_clients,
