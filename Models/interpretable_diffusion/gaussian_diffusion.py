@@ -239,7 +239,16 @@ class Diffusion_TS(nn.Module):
                 extract(self.sqrt_one_minus_alphas_cumprod, t, x_start.shape) * noise
         )
 
-    def _train_loss(self, x_start, t, target=None, noise=None, padding_masks=None):
+    def _train_loss(
+        self,
+        x_start,
+        t,
+        target=None,
+        noise=None,
+        padding_masks=None,
+        t_model_out=None,
+        t_exclude_feats=None,
+    ):
         noise = default(noise, lambda: torch.randn_like(x_start))
         if target is None:
             target = x_start
@@ -248,8 +257,10 @@ class Diffusion_TS(nn.Module):
         model_out = self.output(x, t, padding_masks)
 
         if self.exclude_feats is not None:
-            model_out = model_out[:, :, self.exclude_feats]
-            target = target[:, :, self.exclude_feats]
+            if t_model_out is not None:
+                s_model_out = model_out[..., t_exclude_feats]
+            model_out = model_out[..., self.exclude_feats]
+            target = target[..., self.exclude_feats]
 
         train_loss = self.loss_fn(model_out, target, reduction='none')
 
@@ -261,10 +272,28 @@ class Diffusion_TS(nn.Module):
             fourier_loss = self.loss_fn(torch.real(fft1), torch.real(fft2), reduction='none')\
                            + self.loss_fn(torch.imag(fft1), torch.imag(fft2), reduction='none')
             train_loss +=  self.ff_weight * fourier_loss
-        
+
+        if t_model_out is not None:
+            t_train_loss = self.loss_fn(s_model_out, t_model_out, reduction='none')
+
+            fourier_loss = torch.tensor([0.])
+            if self.use_ff:
+                fft1 = torch.fft.fft(s_model_out.transpose(1, 2), norm='forward')
+                fft2 = torch.fft.fft(t_model_out.transpose(1, 2), norm='forward')
+                fft1, fft2 = fft1.transpose(1, 2), fft2.transpose(1, 2)
+                fourier_loss = self.loss_fn(torch.real(fft1), torch.real(fft2), reduction='none')\
+                            + self.loss_fn(torch.imag(fft1), torch.imag(fft2), reduction='none')
+                t_train_loss +=  self.ff_weight * fourier_loss
+            
+            re_train_loss = torch.zeros(x_start.shape, device=train_loss.device)
+            re_t_train_loss = torch.zeros(x_start.shape, device=t_train_loss.device)
+            re_train_loss[..., self.exclude_feats] = train_loss
+            re_t_train_loss[..., t_exclude_feats] = t_train_loss
+            train_loss = re_train_loss + re_t_train_loss
+
         train_loss = reduce(train_loss, 'b ... -> b (...)', 'mean')
         train_loss = train_loss * extract(self.loss_weight, t, train_loss.shape)
-        return train_loss.mean()
+        return train_loss.mean(), model_out
 
     def forward(self, x, **kwargs):
         b, c, n, device, feature_size, = *x.shape, x.device, self.feature_size

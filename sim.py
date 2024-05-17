@@ -9,6 +9,7 @@ from Federated.horizontal.strategy.fedweightedavg import get_fedweightedavg_fn
 from Federated.horizontal.strategy.fednoavg import get_fednoavg_fn
 from Federated.horizontal.strategy.fedhomoavg import get_fedhomoavg_fn
 from Federated.horizontal.strategy.feddynaavg import get_feddynaavg_fn
+from Federated.horizontal.strategy.fedtsm import get_fedtsm_fn
 from Federated.horizontal.client import get_client_fn
 from Federated.horizontal.utils import partition_features, plot_metrics, increment_path
 
@@ -71,7 +72,14 @@ def parse_args():
         "--strategy",
         type=str,
         default="fedavg",
-        choices=["fedavg", "fedweightedavg", "fednoavg", "fedhomoavg", "feddynaavg"],
+        choices=[
+            "fedavg",
+            "fedweightedavg",
+            "fednoavg",
+            "fedhomoavg",
+            "feddynaavg",
+            "fedtsm",
+        ],
         help="Strategy to use for federated learning",
     )
     parser.add_argument(
@@ -165,6 +173,16 @@ def main():
             args.features_groups,
             model.feature_size,
             args.num_rounds,
+            min_fit_clients=args.num_clients,
+            min_evaluate_clients=args.num_clients,
+            min_available_clients=args.num_clients,
+        )
+
+    elif args.strategy == "fedtsm":
+        strategy = get_fedtsm_fn(
+            model_parameters,
+            args.num_clients,
+            args.features_groups,
             min_fit_clients=args.num_clients,
             min_evaluate_clients=args.num_clients,
             min_available_clients=args.num_clients,

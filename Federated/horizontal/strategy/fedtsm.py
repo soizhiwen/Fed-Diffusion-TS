@@ -11,11 +11,12 @@ from flwr.common import (
     Parameters,
     Scalar,
     ndarrays_to_parameters,
+    parameters_to_ndarrays,
 )
 from flwr.common.logger import log
 from flwr.server.client_manager import ClientManager
 from flwr.server.client_proxy import ClientProxy
-from flwr.server.strategy.aggregate import aggregate_inplace, weighted_loss_avg
+from flwr.server.strategy.aggregate import weighted_loss_avg
 from flwr.server.strategy.fedavg import FedAvg
 
 from Federated.horizontal.strategy.utils import *
@@ -61,6 +62,7 @@ class FedTSM(FedAvg):
         )
         self.num_clients = num_clients
         self.features_groups = features_groups
+        self.t_cid = None
 
     def __repr__(self) -> str:
         """Compute a string representation of the strategy."""
@@ -99,7 +101,15 @@ class FedTSM(FedAvg):
 
         client_pairs = []
         for client in clients:
-            fit_ins = FitIns(parameters[int(client.cid)], config)
+            client_id = int(client.cid)
+            if self.t_cid is not None:
+                params = parameters_to_ndarrays(parameters[client_id])
+                t_params = parameters_to_ndarrays(parameters[self.t_cid])
+                t_exclude_feats = self.features_groups[self.t_cid]
+                concat = list(params) + list(t_params) + [list(t_exclude_feats)]
+                parameters[client_id] = ndarrays_to_parameters(concat)
+
+            fit_ins = FitIns(parameters[client_id], config)
             client_pairs.append((client, fit_ins))
 
         # Return client/config pairs
@@ -151,13 +161,10 @@ class FedTSM(FedAvg):
         if not self.accept_failures and failures:
             return None, {}
 
-        # Does in-place weighted average of results
+        # Convert results to dictionary
         parameters_aggregated = {}
         for client, fit_res in results:
-            aggregated_ndarrays = aggregate_inplace([(client, fit_res)])
-            parameters_aggregated[int(client.cid)] = ndarrays_to_parameters(
-                aggregated_ndarrays
-            )
+            parameters_aggregated[int(client.cid)] = fit_res.parameters
 
         # Aggregate custom metrics if aggregation fn was provided
         metrics_aggregated = {}
@@ -199,6 +206,10 @@ class FedTSM(FedAvg):
                 metrics_aggregated[int(client.cid)] = (
                     self.evaluate_metrics_aggregation_fn(eval_metrics)
                 )
+            self.t_cid = min(
+                metrics_aggregated,
+                key=lambda k: metrics_aggregated[k]["all_context_fid"],
+            )
         elif server_round == 1:  # Only log this warning once
             log(WARNING, "No evaluate_metrics_aggregation_fn provided")
 

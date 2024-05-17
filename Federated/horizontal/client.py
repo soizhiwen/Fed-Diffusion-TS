@@ -1,4 +1,5 @@
 import os
+import copy as cp
 import warnings
 import torch
 import flwr as fl
@@ -30,6 +31,13 @@ class FlowerClient(fl.client.NumPyClient):
         self.client_id = trainer.args.client_id
         self.exclude_feats = self.trainer.args.exclude_feats
 
+        ema_parameters = [val.cpu().numpy() for _, val in self.ema.state_dict().items()]
+        self.len_ema_params = len(ema_parameters)
+
+        if self.trainer.t_model is not None:
+            self.t_model = trainer.t_model
+            self.t_ema = trainer.t_ema
+
     def get_parameters(self):
         model_params = [val.cpu().numpy() for _, val in self.model.state_dict().items()]
         ema_params = [val.cpu().numpy() for _, val in self.ema.state_dict().items()]
@@ -40,12 +48,31 @@ class FlowerClient(fl.client.NumPyClient):
         params_dict = zip(self.model.state_dict().keys(), model_params)
         state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
         self.model.load_state_dict(state_dict, strict=True)
+        parameters = parameters[self.len_model_params :]
 
-        ema_params = parameters[self.len_model_params :]
+        ema_params = parameters[: self.len_ema_params]
         if ema_params:
             params_dict = zip(self.ema.state_dict().keys(), ema_params)
             state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
             self.ema.load_state_dict(state_dict, strict=True)
+            parameters = parameters[self.len_ema_params :]
+
+        t_model_params = parameters[: self.len_model_params]
+        if t_model_params:
+            params_dict = zip(self.t_model.state_dict().keys(), t_model_params)
+            state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
+            self.t_model.load_state_dict(state_dict, strict=True)
+            parameters = parameters[self.len_model_params :]
+
+        t_ema_params = parameters[: self.len_ema_params]
+        if t_ema_params:
+            params_dict = zip(self.t_ema.state_dict().keys(), t_ema_params)
+            state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
+            self.t_ema.load_state_dict(state_dict, strict=True)
+            parameters = parameters[self.len_ema_params :]
+
+        if parameters:
+            self.t_model.exclude_feats = parameters[-1]
 
     def fit(self, parameters, config):
         # Update local model parameters
@@ -190,6 +217,7 @@ def get_client_fn(config, args, model):
             config=config,
             args=args,
             model=model,
+            t_model=cp.deepcopy(model) if "tsm" in args.strategy else None,
             dataloader=dataloader_info,
         )
 

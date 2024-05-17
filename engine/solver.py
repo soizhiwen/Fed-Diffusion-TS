@@ -21,9 +21,10 @@ def cycle(dl):
 
 
 class Trainer(object):
-    def __init__(self, config, args, model, dataloader, logger=None):
+    def __init__(self, config, args, model, t_model, dataloader, logger=None):
         super().__init__()
         self.model = model
+        self.t_model = t_model
         self.device = self.model.betas.device
         self.train_num_steps = config['solver']['max_epochs']
         self.gradient_accumulate_every = config['solver']['gradient_accumulate_every']
@@ -46,6 +47,11 @@ class Trainer(object):
         self.opt = Adam(filter(lambda p: p.requires_grad, self.model.parameters()), lr=start_lr, betas=[0.9, 0.96])
         self.ema = EMA(self.model, beta=ema_decay, update_every=ema_update_every).to(self.device)
 
+        if self.t_model is not None:
+            self.t_model.exclude_feats = args.exclude_feats
+            self.t_opt = Adam(filter(lambda p: p.requires_grad, self.t_model.parameters()), lr=start_lr, betas=[0.9, 0.96])
+            self.t_ema = EMA(self.t_model, beta=ema_decay, update_every=ema_update_every).to(self.device)
+
         sc_cfg = config['solver']['scheduler']
         sc_cfg['params']['optimizer'] = self.opt
         self.sch = instantiate_from_config(sc_cfg)
@@ -63,6 +69,10 @@ class Trainer(object):
             'ema': self.ema.state_dict(),
             'opt': self.opt.state_dict(),
         }
+        if self.t_model is not None:
+            data['t_model'] = self.t_model.state_dict()
+            data['t_ema'] = self.t_ema.state_dict()
+            data['t_opt'] = self.t_opt.state_dict()
         torch.save(data, str(self.results_folder / f'checkpoint-{milestone}_{self.args.client_id}.pt'))
 
     def load(self, milestone, verbose=False):
@@ -74,6 +84,10 @@ class Trainer(object):
         self.step = data['step']
         self.opt.load_state_dict(data['opt'])
         self.ema.load_state_dict(data['ema'])
+        if self.t_model is not None:
+            self.t_model.load_state_dict(data['t_model'])
+            self.t_ema.load_state_dict(data['t_ema'])
+            self.t_opt.load_state_dict(data['t_opt'])
         self.milestone = milestone
 
     def train(self):
@@ -89,7 +103,16 @@ class Trainer(object):
                 total_loss = 0.
                 for _ in range(self.gradient_accumulate_every):
                     data = next(self.dl).to(device)
-                    loss = self.model(data, target=data)
+                    if self.t_model is not None:
+                        _, t_model_out =  self.t_model(data, target=data)
+                        loss, _ = self.model(
+                            data,
+                            target=data,
+                            t_model_out=t_model_out,
+                            t_exclude_feats=self.t_model.exclude_feats,
+                        )
+                    else:
+                        loss, _ = self.model(data, target=data)
                     loss = loss / self.gradient_accumulate_every
                     loss.backward()
                     total_loss += loss.item()
