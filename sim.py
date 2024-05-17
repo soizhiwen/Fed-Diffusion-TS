@@ -183,6 +183,7 @@ def main():
             model_parameters,
             args.num_clients,
             args.features_groups,
+            args.save_dir,
             min_fit_clients=args.num_clients,
             min_evaluate_clients=args.num_clients,
             min_available_clients=args.num_clients,

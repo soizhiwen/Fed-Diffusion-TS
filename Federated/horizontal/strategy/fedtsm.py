@@ -20,6 +20,7 @@ from flwr.server.strategy.aggregate import weighted_loss_avg
 from flwr.server.strategy.fedavg import FedAvg
 
 from Federated.horizontal.strategy.utils import *
+from Federated.horizontal.utils import write_csv
 
 
 class FedTSM(FedAvg):
@@ -27,6 +28,7 @@ class FedTSM(FedAvg):
         self,
         num_clients: int,
         features_groups: List[Tuple[int]],
+        save_dir: str,
         *,
         fraction_fit: float = 1.0,
         fraction_evaluate: float = 1.0,
@@ -62,6 +64,7 @@ class FedTSM(FedAvg):
         )
         self.num_clients = num_clients
         self.features_groups = features_groups
+        self.save_dir = save_dir
         self.t_cid = None
 
     def __repr__(self) -> str:
@@ -106,7 +109,7 @@ class FedTSM(FedAvg):
                 params = parameters_to_ndarrays(parameters[client_id])
                 t_params = parameters_to_ndarrays(parameters[self.t_cid])
                 t_exclude_feats = self.features_groups[self.t_cid]
-                concat = list(params) + list(t_params) + [list(t_exclude_feats)]
+                concat = list(params) + list(t_params) + [t_exclude_feats]
                 parameters[client_id] = ndarrays_to_parameters(concat)
 
             fit_ins = FitIns(parameters[client_id], config)
@@ -174,6 +177,20 @@ class FedTSM(FedAvg):
                 metrics_aggregated[int(client.cid)] = self.fit_metrics_aggregation_fn(
                     fit_metrics
                 )
+
+            for cid, metrics in metrics_aggregated.items():
+                len_group = len(self.features_groups[cid])
+                metrics_aggregated[cid]["feats_loss"] = (
+                    metrics["train_loss"] / len_group
+                )
+
+            self.t_cid = min(
+                metrics_aggregated,
+                key=lambda k: metrics_aggregated[k]["feats_loss"],
+            )
+            fields = [server_round, self.t_cid]
+            write_csv(fields, "teachers", self.save_dir)
+
         elif server_round == 1:  # Only log this warning once
             log(WARNING, "No fit_metrics_aggregation_fn provided")
 
@@ -206,10 +223,6 @@ class FedTSM(FedAvg):
                 metrics_aggregated[int(client.cid)] = (
                     self.evaluate_metrics_aggregation_fn(eval_metrics)
                 )
-            self.t_cid = min(
-                metrics_aggregated,
-                key=lambda k: metrics_aggregated[k]["all_context_fid"],
-            )
         elif server_round == 1:  # Only log this warning once
             log(WARNING, "No evaluate_metrics_aggregation_fn provided")
 
@@ -220,6 +233,7 @@ def get_fedtsm_fn(
     model_parameters,
     num_clients,
     features_groups,
+    save_dir,
     *,
     fraction_fit=1.0,
     fraction_evaluate=1.0,
@@ -230,6 +244,7 @@ def get_fedtsm_fn(
     strategy = FedTSM(
         num_clients=num_clients,
         features_groups=features_groups,
+        save_dir=save_dir,
         fraction_fit=fraction_fit,
         fraction_evaluate=fraction_evaluate,
         min_fit_clients=min_fit_clients,
