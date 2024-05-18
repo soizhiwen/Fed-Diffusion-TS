@@ -9,7 +9,7 @@ python sim.py --num_clients 10 --num_rounds 10 \
     --num_cpus 6 --num_gpus 0.3
 
 # FedAvg with mask
-python sim.py --num_clients --num_rounds 10 \
+python sim.py --num_clients 10 --num_rounds 10 \
     --split_type balance_label --strategy fedavg \
     --config_file ./Config/stocks_hfl_mask.yaml \
     --full_ratio 0.2 --num_cpus 6 --num_gpus 0.3
@@ -57,7 +57,7 @@ python sim.py --num_clients 10 --num_rounds 10 \
     --num_cpus 6 --num_gpus 0.3
 
 # FedAvg with mask
-python sim.py --num_clients --num_rounds 10 \
+python sim.py --num_clients 10 --num_rounds 10 \
     --split_type balance_label --strategy fedavg \
     --config_file ./Config/energy_hfl_mask.yaml \
     --full_ratio 0.2 --num_cpus 6 --num_gpus 0.3
@@ -105,7 +105,7 @@ python sim.py --num_clients 10 --num_rounds 10 \
     --num_cpus 6 --num_gpus 0.3
 
 # FedAvg with mask
-python sim.py --num_clients --num_rounds 10 \
+python sim.py --num_clients 10 --num_rounds 10 \
     --split_type balance_label --strategy fedavg \
     --config_file ./Config/etth_hfl_mask.yaml \
     --full_ratio 0.2 --num_cpus 6 --num_gpus 0.3
