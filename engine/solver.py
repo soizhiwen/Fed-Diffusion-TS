@@ -90,7 +90,7 @@ class Trainer(object):
             self.t_opt.load_state_dict(data['t_opt'])
         self.milestone = milestone
 
-    def train(self):
+    def train(self, is_teacher=True):
         device = self.device
         step = 0
         if self.logger is not None:
@@ -103,7 +103,7 @@ class Trainer(object):
                 total_loss = 0.
                 for _ in range(self.gradient_accumulate_every):
                     data = next(self.dl).to(device)
-                    if self.t_model is not None:
+                    if self.t_model is not None and not is_teacher:
                         _, t_model_out =  self.t_model(data, target=data)
                         loss, _ = self.model(
                             data,

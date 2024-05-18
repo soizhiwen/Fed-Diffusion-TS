@@ -79,9 +79,13 @@ class FlowerClient(fl.client.NumPyClient):
         self.set_parameters(parameters)
 
         # Get hyperparameters for this round
+        if "t_cid" in config:
+            is_teacher = config["t_cid"] == self.client_id or config["t_cid"] == -1
+        else:
+            is_teacher = True
         server_round = config["server_round"]
         self.trainer.train_num_steps = config["local_epochs"]
-        train_loss = self.trainer.train()
+        train_loss = self.trainer.train(is_teacher=is_teacher)
 
         parameters_prime = self.get_parameters()
         dataset = self.trainer.dataloader_info["dataset"]

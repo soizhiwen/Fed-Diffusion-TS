@@ -289,7 +289,7 @@ class Diffusion_TS(nn.Module):
             re_t_train_loss = torch.zeros(x_start.shape, device=t_train_loss.device)
             re_train_loss[..., self.exclude_feats] = train_loss
             re_t_train_loss[..., t_exclude_feats] = t_train_loss
-            train_loss = re_train_loss + re_t_train_loss
+            train_loss = re_train_loss +  3 * re_t_train_loss
 
         train_loss = reduce(train_loss, 'b ... -> b (...)', 'mean')
         train_loss = train_loss * extract(self.loss_weight, t, train_loss.shape)

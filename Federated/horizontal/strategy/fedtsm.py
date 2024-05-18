@@ -65,7 +65,7 @@ class FedTSM(FedAvg):
         self.num_clients = num_clients
         self.features_groups = features_groups
         self.save_dir = save_dir
-        self.t_cid = None
+        self.t_cid = -1
 
     def __repr__(self) -> str:
         """Compute a string representation of the strategy."""
@@ -93,6 +93,7 @@ class FedTSM(FedAvg):
         if self.on_fit_config_fn is not None:
             # Custom fit config function provided
             config = self.on_fit_config_fn(server_round)
+        config["t_cid"] = self.t_cid
 
         # Sample clients
         sample_size, min_num_clients = self.num_fit_clients(
@@ -105,7 +106,7 @@ class FedTSM(FedAvg):
         client_pairs = []
         for client in clients:
             client_id = int(client.cid)
-            if self.t_cid is not None:
+            if self.t_cid != -1:
                 params = parameters_to_ndarrays(parameters[client_id])
                 t_params = parameters_to_ndarrays(parameters[self.t_cid])
                 t_exclude_feats = self.features_groups[self.t_cid]
