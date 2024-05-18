@@ -13,7 +13,7 @@ from Federated.horizontal.strategy.fedtsm import get_fedtsm_fn
 from Federated.horizontal.client import get_client_fn
 from Federated.horizontal.utils import partition_features, plot_metrics, increment_path
 
-from Utils.io_utils import load_yaml_config, instantiate_from_config
+from Utils.io_utils import load_yaml_config, instantiate_from_config, seed_everything
 
 warnings.filterwarnings("ignore")
 
@@ -101,6 +101,12 @@ def parse_args():
         default=0.5,
         help="Ratio of GPU memory to assign to a virtual client",
     )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=12345,
+        help="Seed for initializing training.",
+    )
 
     args = parser.parse_args()
     args.save_dir = increment_path(f"{args.output}/{args.name}", sep="_", mkdir=True)
@@ -114,6 +120,9 @@ def parse_args():
 def main():
     args = parse_args()
     config = load_yaml_config(args.config_file)
+
+    if args.seed is not None:
+        seed_everything(args.seed, cudnn_deterministic=True)
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = instantiate_from_config(config["model"]).to(device)
