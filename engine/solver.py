@@ -104,7 +104,15 @@ class Trainer(object):
                 for _ in range(self.gradient_accumulate_every):
                     data = next(self.dl).to(device)
                     if self.t_model is not None and not is_teacher:
-                        _, t_model_out =  self.t_model(data, target=data)
+                        for param in self.t_model.parameters():
+                            param.requires_grad = False
+                        t_model_outs = [
+                            self.t_model(data, target=data)[1]
+                            for _ in range(10)
+                        ]
+                        t_model_outs = torch.stack(t_model_outs, dim=0)
+                        t_model_out, _= torch.median(t_model_outs, dim=0)
+
                         loss, _ = self.model(
                             data,
                             target=data,
