@@ -104,23 +104,28 @@ class Trainer(object):
                 for _ in range(self.gradient_accumulate_every):
                     data = next(self.dl).to(device)
                     if self.t_model is not None and not is_teacher:
+                        # Use teacher model to generate target
                         for param in self.t_model.parameters():
                             param.requires_grad = False
                         t_model_outs = [
-                            self.t_model(data, target=data)[1]
-                            for _ in range(10)
+                            self.t_model(data, target=data, forward=True)
+                            for _ in range(5)
                         ]
                         t_model_outs = torch.stack(t_model_outs, dim=0)
                         t_model_out, _= torch.median(t_model_outs, dim=0)
 
-                        loss, _ = self.model(
-                            data,
-                            target=data,
+                        # Replace student existing features to teacher model output
+                        re_t_model_out = t_model_out.detach().clone()
+                        re_t_model_out[..., self.model.exclude_feats] = data[..., self.model.exclude_feats]
+
+                        # Use student model to learn from teacher model output
+                        loss = self.model(
+                            re_t_model_out,
+                            target=re_t_model_out,
                             t_model_out=t_model_out,
-                            t_exclude_feats=self.t_model.exclude_feats,
                         )
                     else:
-                        loss, _ = self.model(data, target=data)
+                        loss = self.model(data, target=data)
                     loss = loss / self.gradient_accumulate_every
                     loss.backward()
                     total_loss += loss.item()

@@ -247,7 +247,7 @@ class Diffusion_TS(nn.Module):
         noise=None,
         padding_masks=None,
         t_model_out=None,
-        t_exclude_feats=None,
+        forward=False,
     ):
         noise = default(noise, lambda: torch.randn_like(x_start))
         if target is None:
@@ -256,9 +256,13 @@ class Diffusion_TS(nn.Module):
         x = self.q_sample(x_start=x_start, t=t, noise=noise)  # noise sample
         model_out = self.output(x, t, padding_masks)
 
+        if forward:
+            return model_out
+        
+        if t_model_out is not None:
+            s_model_out = model_out.detach().clone()
+
         if self.exclude_feats is not None:
-            if t_model_out is not None:
-                s_model_out = model_out[..., t_exclude_feats]
             model_out = model_out[..., self.exclude_feats]
             target = target[..., self.exclude_feats]
 
@@ -285,15 +289,13 @@ class Diffusion_TS(nn.Module):
                             + self.loss_fn(torch.imag(fft1), torch.imag(fft2), reduction='none')
                 t_train_loss +=  self.ff_weight * fourier_loss
             
-            re_train_loss = torch.zeros(x_start.shape, device=train_loss.device)
-            re_t_train_loss = torch.zeros(x_start.shape, device=t_train_loss.device)
+            re_train_loss = torch.zeros(s_model_out.shape, device=train_loss.device)
             re_train_loss[..., self.exclude_feats] = train_loss
-            re_t_train_loss[..., t_exclude_feats] = t_train_loss
-            train_loss = re_train_loss +  3 * re_t_train_loss
+            train_loss = re_train_loss +  t_train_loss
 
         train_loss = reduce(train_loss, 'b ... -> b (...)', 'mean')
         train_loss = train_loss * extract(self.loss_weight, t, train_loss.shape)
-        return train_loss.mean(), model_out
+        return train_loss.mean()
 
     def forward(self, x, **kwargs):
         b, c, n, device, feature_size, = *x.shape, x.device, self.feature_size
