@@ -108,22 +108,17 @@ class Trainer(object):
                         for param in self.t_model.parameters():
                             param.requires_grad = False
                         t_model_outs = [
-                            self.t_model(data, target=data, forward=True)
+                            self.t_model(data, target=data, forward_only=True)
                             for _ in range(5)
                         ]
                         t_model_outs = torch.stack(t_model_outs, dim=0)
                         t_model_out, _= torch.median(t_model_outs, dim=0)
 
                         # Replace student existing features to teacher model output
-                        re_t_model_out = t_model_out.detach().clone()
-                        re_t_model_out[..., self.model.exclude_feats] = data[..., self.model.exclude_feats]
+                        t_model_out[..., self.model.exclude_feats] = data[..., self.model.exclude_feats]
 
                         # Use student model to learn from teacher model output
-                        loss = self.model(
-                            re_t_model_out,
-                            target=re_t_model_out,
-                            t_model_out=t_model_out,
-                        )
+                        loss = self.model(t_model_out, target=t_model_out, exclude=False)
                     else:
                         loss = self.model(data, target=data)
                     loss = loss / self.gradient_accumulate_every
