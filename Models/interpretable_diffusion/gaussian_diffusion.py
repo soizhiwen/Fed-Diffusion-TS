@@ -247,7 +247,6 @@ class Diffusion_TS(nn.Module):
         noise=None,
         padding_masks=None,
         exclude=True,
-        forward_only=False,
     ):
         noise = default(noise, lambda: torch.randn_like(x_start))
         if target is None:
@@ -255,9 +254,6 @@ class Diffusion_TS(nn.Module):
 
         x = self.q_sample(x_start=x_start, t=t, noise=noise)  # noise sample
         model_out = self.output(x, t, padding_masks)
-
-        if forward_only:
-            return model_out
 
         if self.exclude_feats is not None and exclude:
             model_out = model_out[..., self.exclude_feats]
@@ -276,7 +272,7 @@ class Diffusion_TS(nn.Module):
 
         train_loss = reduce(train_loss, 'b ... -> b (...)', 'mean')
         train_loss = train_loss * extract(self.loss_weight, t, train_loss.shape)
-        return train_loss.mean()
+        return train_loss.mean(), model_out
 
     def forward(self, x, **kwargs):
         b, c, n, device, feature_size, = *x.shape, x.device, self.feature_size

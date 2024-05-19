@@ -3,6 +3,7 @@ import sys
 import time
 import torch
 import numpy as np
+import torch.nn.functional as F
 
 from pathlib import Path
 from tqdm.auto import tqdm
@@ -105,25 +106,44 @@ class Trainer(object):
                     data = next(self.dl).to(device)
                     if self.t_model is not None and not is_teacher:
                         # Use teacher model to generate target
-                        for param in self.t_model.parameters():
-                            param.requires_grad = False
-                        t_model_outs = [
-                            self.t_model(data, target=data, forward_only=True)
-                            for _ in range(5)
-                        ]
+                        t_losses = []
+                        t_model_outs = []
+                        with torch.no_grad():
+                            for _ in range(5):
+                                t_loss, t_model_out = self.t_model(
+                                    data, 
+                                    target=data, 
+                                    exclude=False
+                                )
+                                t_losses.append(t_loss)
+                                t_model_outs.append(t_model_out)
+
+                        t_losses = torch.stack(t_losses, dim=0)
+                        t_loss, _= torch.median(t_losses, dim=0)
                         t_model_outs = torch.stack(t_model_outs, dim=0)
                         t_model_out, _= torch.median(t_model_outs, dim=0)
 
-                        # Replace student existing features to teacher model output
+                        # Replace teacher model output with student existing features
                         t_model_out[..., self.model.exclude_feats] = data[..., self.model.exclude_feats]
 
                         # Use student model to learn from teacher model output
-                        loss = self.model(t_model_out, target=t_model_out, exclude=False)
+                        loss, _ = self.model(t_model_out, target=t_model_out, exclude=False)
                     else:
-                        loss = self.model(data, target=data)
+                        loss, _ = self.model(data, target=data)
                     loss = loss / self.gradient_accumulate_every
                     loss.backward()
                     total_loss += loss.item()
+
+                    if self.args.acc_thold != -1 and self.t_model is not None and not is_teacher:
+                        # Use student model to train on original data
+                        with torch.no_grad():
+                            loss, _ = self.model(data, target=data, exclude=False)
+                        # Replace student model with teacher model 
+                        # if student cannot learn from teacher model output
+                        loss, t_loss = F.normalize(torch.tensor([loss, t_loss]), dim=0)
+                        diff_loss = torch.abs(loss - t_loss)
+                        if diff_loss >= self.args.acc_thold:
+                            self.model.load_state_dict(self.t_model.state_dict(), strict=True)
 
                 total_losses += total_loss
                 pbar.set_description(f'loss: {total_loss:.6f}')

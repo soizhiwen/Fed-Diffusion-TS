@@ -90,6 +90,12 @@ def parse_args():
         help="Type of data partitioning",
     )
     parser.add_argument(
+        "--acc_thold",
+        type=float,
+        default=-1,
+        help="Accelerate threshold (only for FedTSM)",
+    )
+    parser.add_argument(
         "--num_cpus",
         type=int,
         default=2,
