@@ -114,7 +114,6 @@ class FedAccTSM(FedAvg):
             if self.t_cid != -1:
                 if self.overwrite:
                     params = parameters_to_ndarrays(parameters[self.t_cid])
-                    self.overwrite = False
                 else:
                     params = parameters_to_ndarrays(parameters[client_id])
                 t_params = parameters_to_ndarrays(parameters[self.t_cid])
@@ -124,6 +123,8 @@ class FedAccTSM(FedAvg):
 
             fit_ins = FitIns(parameters[client_id], config)
             client_pairs.append((client, fit_ins))
+
+        self.overwrite = False
 
         # Return client/config pairs
         return client_pairs
