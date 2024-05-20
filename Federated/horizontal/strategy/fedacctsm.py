@@ -68,6 +68,7 @@ class FedAccTSM(FedAvg):
         self.features_groups = features_groups
         self.save_dir = save_dir
         self.t_cid = -1
+        self.overwrite = False
 
     def __repr__(self) -> str:
         """Compute a string representation of the strategy."""
@@ -96,6 +97,8 @@ class FedAccTSM(FedAvg):
             # Custom fit config function provided
             config = self.on_fit_config_fn(server_round)
         config["t_cid"] = self.t_cid
+        if server_round < 2:
+            config.pop("local_epochs", None)
 
         # Sample clients
         sample_size, min_num_clients = self.num_fit_clients(
@@ -109,7 +112,11 @@ class FedAccTSM(FedAvg):
         for client in clients:
             client_id = int(client.cid)
             if self.t_cid != -1:
-                params = parameters_to_ndarrays(parameters[client_id])
+                if self.overwrite:
+                    params = parameters_to_ndarrays(parameters[self.t_cid])
+                    self.overwrite = False
+                else:
+                    params = parameters_to_ndarrays(parameters[client_id])
                 t_params = parameters_to_ndarrays(parameters[self.t_cid])
                 t_exclude_feats = self.features_groups[self.t_cid]
                 concat = list(params) + list(t_params) + [t_exclude_feats]
@@ -219,6 +226,9 @@ class FedAccTSM(FedAvg):
                 metrics_aggregated[cid]["feats_context_fid"] = (
                     metrics["exist_context_fid"] / penalty
                 )
+
+            if self.t_cid == -1:
+                self.overwrite = True
 
             self.t_cid = min(
                 metrics_aggregated,

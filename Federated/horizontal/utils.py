@@ -187,7 +187,7 @@ def plot_metrics(history, strategy, save_dir):
             plt.savefig(f"{save_dir}/{k}.pdf", bbox_inches="tight")
             plt.clf()
 
-    elif strategy in ["fednoavg", "fedhomoavg", "fedtsm"]:
+    elif strategy in ["fednoavg", "fedhomoavg", "fedtsm", "fedacctsm"]:
         for id, rounds in history.metrics_distributed_fit.items():
             for r, m in rounds:
                 metrics["train_loss"].append((r, m["train_loss"], id))
