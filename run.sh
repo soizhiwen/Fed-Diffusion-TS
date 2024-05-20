@@ -45,13 +45,6 @@ python sim.py --num_clients 10 --num_rounds 10 \
     --config_file ./Config/stocks_hfl_mask.yaml \
     --full_ratio 0.2 --num_cpus 6 --num_gpus 0.3
 
-# FedTSM with accelerate
-python sim.py --num_clients 10 --num_rounds 10 \
-    --split_type balance_label --strategy fedtsm \
-    --config_file ./Config/stocks_hfl_mask.yaml \
-    --full_ratio 0.2 --num_cpus 6 --num_gpus 0.3 \
-    --acc_thold 0.1
-
 
 ###############################################################################
 # Energy Dataset
@@ -100,13 +93,6 @@ python sim.py --num_clients 10 --num_rounds 10 \
     --config_file ./Config/energy_hfl_mask.yaml \
     --full_ratio 0.2 --num_cpus 6 --num_gpus 0.3
 
-# FedTSM with accelerate
-python sim.py --num_clients 10 --num_rounds 10 \
-    --split_type balance_label --strategy fedtsm \
-    --config_file ./Config/energy_hfl_mask.yaml \
-    --full_ratio 0.2 --num_cpus 6 --num_gpus 0.3 \
-    --acc_thold 0.1
-
 
 ###############################################################################
 # ETTh Dataset
@@ -154,10 +140,3 @@ python sim.py --num_clients 10 --num_rounds 10 \
     --split_type balance_label --strategy fedtsm \
     --config_file ./Config/etth_hfl_mask.yaml \
     --full_ratio 0.2 --num_cpus 6 --num_gpus 0.3
-
-# FedTSM with accelerate
-python sim.py --num_clients 10 --num_rounds 10 \
-    --split_type balance_label --strategy fedtsm \
-    --config_file ./Config/etth_hfl_mask.yaml \
-    --full_ratio 0.2 --num_cpus 6 --num_gpus 0.3 \
-    --acc_thold 0.1
