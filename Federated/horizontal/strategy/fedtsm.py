@@ -27,6 +27,7 @@ class FedTSM(FedAvg):
     def __init__(
         self,
         num_clients: int,
+        num_features_total: int,
         features_groups: List[Tuple[int]],
         save_dir: str,
         *,
@@ -63,6 +64,7 @@ class FedTSM(FedAvg):
             evaluate_metrics_aggregation_fn=evaluate_metrics_aggregation_fn,
         )
         self.num_clients = num_clients
+        self.num_features_total = num_features_total
         self.features_groups = features_groups
         self.save_dir = save_dir
         self.t_cid = -1
@@ -178,20 +180,6 @@ class FedTSM(FedAvg):
                 metrics_aggregated[int(client.cid)] = self.fit_metrics_aggregation_fn(
                     fit_metrics
                 )
-
-            for cid, metrics in metrics_aggregated.items():
-                len_group = len(self.features_groups[cid])
-                metrics_aggregated[cid]["feats_loss"] = (
-                    metrics["train_loss"] / len_group
-                )
-
-            self.t_cid = min(
-                metrics_aggregated,
-                key=lambda k: metrics_aggregated[k]["feats_loss"],
-            )
-            fields = [server_round, self.t_cid]
-            write_csv(fields, "teachers", self.save_dir)
-
         elif server_round == 1:  # Only log this warning once
             log(WARNING, "No fit_metrics_aggregation_fn provided")
 
@@ -224,6 +212,21 @@ class FedTSM(FedAvg):
                 metrics_aggregated[int(client.cid)] = (
                     self.evaluate_metrics_aggregation_fn(eval_metrics)
                 )
+
+            for cid, metrics in metrics_aggregated.items():
+                len_group = len(self.features_groups[cid])
+                penalty = (len_group / self.num_features_total) ** 4
+                metrics_aggregated[cid]["feats_context_fid"] = (
+                    metrics["exist_context_fid"] / penalty
+                )
+
+            self.t_cid = min(
+                metrics_aggregated,
+                key=lambda k: metrics_aggregated[k]["feats_context_fid"],
+            )
+            fields = [server_round, self.t_cid]
+            write_csv(fields, "teachers", self.save_dir)
+
         elif server_round == 1:  # Only log this warning once
             log(WARNING, "No evaluate_metrics_aggregation_fn provided")
 
@@ -233,6 +236,7 @@ class FedTSM(FedAvg):
 def get_fedtsm_fn(
     model_parameters,
     num_clients,
+    num_features_total,
     features_groups,
     save_dir,
     *,
@@ -244,6 +248,7 @@ def get_fedtsm_fn(
 ):
     strategy = FedTSM(
         num_clients=num_clients,
+        num_features_total=num_features_total,
         features_groups=features_groups,
         save_dir=save_dir,
         fraction_fit=fraction_fit,

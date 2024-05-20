@@ -197,6 +197,7 @@ def main():
         strategy = get_fedtsm_fn(
             model_parameters,
             args.num_clients,
+            model.feature_size,
             args.features_groups,
             args.save_dir,
             min_fit_clients=args.num_clients,
