@@ -1,5 +1,6 @@
 from logging import WARNING
 from typing import Callable, Dict, List, Optional, Tuple, Union
+import numpy as np
 
 from flwr.common import (
     EvaluateIns,
@@ -16,7 +17,7 @@ from flwr.common import (
 from flwr.common.logger import log
 from flwr.server.client_manager import ClientManager
 from flwr.server.client_proxy import ClientProxy
-from flwr.server.strategy.aggregate import weighted_loss_avg
+from flwr.server.strategy.aggregate import aggregate_inplace, weighted_loss_avg
 from flwr.server.strategy.fedavg import FedAvg
 
 from Federated.horizontal.strategy.utils import *
@@ -68,7 +69,7 @@ class FedAccTSM(FedAvg):
         self.features_groups = features_groups
         self.save_dir = save_dir
         self.t_cid = -1
-        self.overwrite = False
+        self.best_clients = []
 
     def __repr__(self) -> str:
         """Compute a string representation of the strategy."""
@@ -108,15 +109,21 @@ class FedAccTSM(FedAvg):
             num_clients=sample_size, min_num_clients=min_num_clients
         )
 
+        # Does in-place weighted average of results
+        if self.best_clients:
+            for i, (client, _) in enumerate(self.best_clients):
+                self.best_clients[i][1].parameters = parameters[int(client.cid)]
+            aggregated_ndarrays = aggregate_inplace(self.best_clients)
+
         client_pairs = []
         for client in clients:
             client_id = int(client.cid)
             if self.t_cid != -1:
-                if self.overwrite:
-                    params = parameters_to_ndarrays(parameters[self.t_cid])
-                    self.overwrite = False
-                else:
-                    params = parameters_to_ndarrays(parameters[client_id])
+                params = (
+                    aggregated_ndarrays
+                    if self.best_clients
+                    else parameters_to_ndarrays(parameters[client_id])
+                )
                 t_params = parameters_to_ndarrays(parameters[self.t_cid])
                 t_exclude_feats = self.features_groups[self.t_cid]
                 concat = list(params) + list(t_params) + [t_exclude_feats]
@@ -124,6 +131,8 @@ class FedAccTSM(FedAvg):
 
             fit_ins = FitIns(parameters[client_id], config)
             client_pairs.append((client, fit_ins))
+
+        self.best_clients = []
 
         # Return client/config pairs
         return client_pairs
@@ -220,20 +229,34 @@ class FedAccTSM(FedAvg):
                     self.evaluate_metrics_aggregation_fn(eval_metrics)
                 )
 
+            norm_context_fid = []
             for cid, metrics in metrics_aggregated.items():
                 len_group = len(self.features_groups[cid])
                 penalty = (len_group / self.num_features_total) ** 4
-                metrics_aggregated[cid]["feats_context_fid"] = (
-                    metrics["exist_context_fid"] / penalty
-                )
+                data = metrics["exist_context_fid"] / penalty
+                norm_context_fid.append((data, cid))
 
             if self.t_cid == -1:
-                self.overwrite = True
+                norm_context_fid = np.array(norm_context_fid)
+                min_val = np.min(norm_context_fid[:, 0])
+                max_val = np.max(norm_context_fid[:, 0])
+                data = norm_context_fid[:, 0]
+                norm_context_fid[:, 0] = (data - min_val) / (max_val - min_val)
 
-            self.t_cid = min(
-                metrics_aggregated,
-                key=lambda k: metrics_aggregated[k]["feats_context_fid"],
-            )
+                best_cid = norm_context_fid[norm_context_fid[:, 0] < 0.0002, 1]
+                best_cid = best_cid.astype(int).tolist()
+                fields = [server_round, best_cid]
+                write_csv(fields, "best_clients", self.save_dir)
+
+                self.best_clients = []
+                for client, evaluate_res in results:
+                    if int(client.cid) in best_cid:
+                        fit_res = FitRes(None, None, evaluate_res.num_examples, {})
+                        self.best_clients.append((client, fit_res))
+
+                norm_context_fid = norm_context_fid.tolist()
+
+            self.t_cid = int(min(norm_context_fid)[1])
             fields = [server_round, self.t_cid]
             write_csv(fields, "teachers", self.save_dir)
 
