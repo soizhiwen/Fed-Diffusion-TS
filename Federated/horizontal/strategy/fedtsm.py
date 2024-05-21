@@ -213,14 +213,17 @@ class FedTSM(FedAvg):
                     self.evaluate_metrics_aggregation_fn(eval_metrics)
                 )
 
-            norm_context_fid = []
             for cid, metrics in metrics_aggregated.items():
                 len_group = len(self.features_groups[cid])
                 penalty = (len_group / self.num_features_total) ** 4
-                data = metrics["exist_context_fid"] / penalty
-                norm_context_fid.append((data, cid))
+                metrics_aggregated[cid]["feats_context_fid"] = (
+                    metrics["exist_context_fid"] / penalty
+                )
 
-            self.t_cid = min(norm_context_fid)[1]
+            self.t_cid = min(
+                metrics_aggregated,
+                key=lambda k: metrics_aggregated[k]["feats_context_fid"],
+            )
             fields = [server_round, self.t_cid]
             write_csv(fields, "teachers", self.save_dir)
 
