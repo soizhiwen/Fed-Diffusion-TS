@@ -217,8 +217,8 @@ class FedTSM(FedAvg):
             for cid, metrics in metrics_aggregated.items():
                 len_group = len(self.features_groups[cid])
                 penalty = (len_group / self.num_features_total) ** 4
-                norm_data = metrics["exist_context_fid"] / penalty
-                norm_context_fid.append((norm_data, cid))
+                data = metrics["exist_context_fid"] / penalty
+                norm_context_fid.append((data, cid))
 
             self.t_cid = min(norm_context_fid)[1]
             fields = [server_round, self.t_cid]
