@@ -68,7 +68,7 @@ class FedAccTSM(FedAvg):
         self.features_groups = features_groups
         self.save_dir = save_dir
         self.t_cid = -1
-        self.overwrite = True
+        self.overwrite_cids = []
 
     def __repr__(self) -> str:
         """Compute a string representation of the strategy."""
@@ -96,11 +96,6 @@ class FedAccTSM(FedAvg):
         if self.on_fit_config_fn is not None:
             # Custom fit config function provided
             config = self.on_fit_config_fn(server_round)
-        config["t_cid"] = self.t_cid
-        if server_round < 6:
-            config["local_epochs"] = 5000
-        else:
-            self.overwrite = False
 
         # Sample clients
         sample_size, min_num_clients = self.num_fit_clients(
@@ -113,11 +108,10 @@ class FedAccTSM(FedAvg):
         client_pairs = []
         for client in clients:
             client_id = int(client.cid)
+            config["t_cid"] = -1 if client_id in self.overwrite_cids else self.t_cid
+
             if self.t_cid != -1:
-                if self.overwrite:
-                    params = parameters_to_ndarrays(parameters[self.t_cid])
-                else:
-                    params = parameters_to_ndarrays(parameters[client_id])
+                params = parameters_to_ndarrays(parameters[client_id])
                 t_params = parameters_to_ndarrays(parameters[self.t_cid])
                 t_exclude_feats = self.features_groups[self.t_cid]
                 concat = list(params) + list(t_params) + [t_exclude_feats]
@@ -188,6 +182,32 @@ class FedAccTSM(FedAvg):
                 metrics_aggregated[int(client.cid)] = self.fit_metrics_aggregation_fn(
                     fit_metrics
                 )
+
+            for cid, metrics in metrics_aggregated.items():
+                len_group = len(self.features_groups[cid])
+                penalty = (len_group / self.num_features_total) ** 4
+                metrics_aggregated[cid]["feats_context_fid"] = (
+                    metrics["fit_exist_context_fid"] / penalty
+                )
+
+            self.t_cid = min(
+                metrics_aggregated,
+                key=lambda k: metrics_aggregated[k]["feats_context_fid"],
+            )
+            fields = [server_round, self.t_cid]
+            write_csv(fields, "teachers", self.save_dir)
+
+            # Update overwrite_cids
+            if server_round > 1 and self.t_cid != -1:
+                self.overwrite_cids = []
+                for client, _ in results:
+                    cid = int(client.cid)
+                    if cid != self.t_cid:
+                        parameters_aggregated[cid] = parameters_aggregated[self.t_cid]
+                        self.overwrite_cids.append(cid)
+                fields = [server_round, self.overwrite_cids]
+                write_csv(fields, "overwrite_cids", self.save_dir)
+
         elif server_round == 1:  # Only log this warning once
             log(WARNING, "No fit_metrics_aggregation_fn provided")
 
@@ -220,21 +240,6 @@ class FedAccTSM(FedAvg):
                 metrics_aggregated[int(client.cid)] = (
                     self.evaluate_metrics_aggregation_fn(eval_metrics)
                 )
-
-            for cid, metrics in metrics_aggregated.items():
-                len_group = len(self.features_groups[cid])
-                penalty = (len_group / self.num_features_total) ** 4
-                metrics_aggregated[cid]["feats_context_fid"] = (
-                    metrics["exist_context_fid"] / penalty
-                )
-
-            self.t_cid = min(
-                metrics_aggregated,
-                key=lambda k: metrics_aggregated[k]["feats_context_fid"],
-            )
-            fields = [server_round, self.t_cid]
-            write_csv(fields, "teachers", self.save_dir)
-
         elif server_round == 1:  # Only log this warning once
             log(WARNING, "No evaluate_metrics_aggregation_fn provided")
 

@@ -161,6 +161,7 @@ def write_csv(fields, name, save_dir):
 def plot_metrics(history, strategy, save_dir):
     m_name = {
         "train_loss": "Train Loss",
+        "fit_exist_context_fid": "Context-FID Score",
         "all_context_fid": "Context-FID Score",
         "all_cross_corr": "Correlational Score",
         "exist_context_fid": "Context-FID Score",
@@ -191,6 +192,10 @@ def plot_metrics(history, strategy, save_dir):
         for id, rounds in history.metrics_distributed_fit.items():
             for r, m in rounds:
                 metrics["train_loss"].append((r, m["train_loss"], id))
+                if "fit_exist_context_fid" in m:
+                    metrics["fit_exist_context_fid"].append(
+                        (r, m["fit_exist_context_fid"], id)
+                    )
 
         for id, rounds in history.metrics_distributed.items():
             for r, m in rounds:

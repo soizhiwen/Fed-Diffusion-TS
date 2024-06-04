@@ -91,6 +91,32 @@ class FlowerClient(fl.client.NumPyClient):
         dataset = self.trainer.dataloader_info["dataset"]
         results = {"train_loss": float(train_loss)}
 
+        # Compute metrics with existing features (FedAccTSM only)
+        if self.trainer.args.strategy == "fedacctsm":
+            size_every = config["size_every"]
+            metric_iterations = config["metric_iterations"]
+            seq_length, feature_dim = dataset.window, dataset.var_num
+
+            ori_data = np.load(
+                f"{dataset.dir}/{dataset.name}_norm_truth_{seq_length}_train.npy"
+            )
+
+            fake_data = self.trainer.sample(
+                num=len(dataset), size_every=size_every, shape=[seq_length, feature_dim]
+            )
+
+            if dataset.auto_norm:
+                fake_data = unnormalize_to_zero_to_one(fake_data)
+
+            if self.exclude_feats:
+                exist_ori_data = ori_data[:, :, self.exclude_feats]
+                exist_fake_data = fake_data[:, :, self.exclude_feats]
+
+                fit_exist_ctx_fid_mean = cal_context_fid(
+                    exist_ori_data, exist_fake_data, iterations=metric_iterations
+                )
+                results["fit_exist_context_fid"] = float(fit_exist_ctx_fid_mean)
+
         for k, v in results.items():
             cid = (
                 f"{self.client_id} {self.exclude_feats}"
