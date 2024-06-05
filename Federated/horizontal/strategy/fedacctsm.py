@@ -1,6 +1,7 @@
 from logging import WARNING
 from typing import Callable, Dict, List, Optional, Tuple, Union
 
+import numpy as np
 from flwr.common import (
     EvaluateIns,
     EvaluateRes,
@@ -186,25 +187,51 @@ class FedAccTSM(FedAvg):
             for cid, metrics in metrics_aggregated.items():
                 len_group = len(self.features_groups[cid])
                 penalty = (len_group / self.num_features_total) ** 4
-                metrics_aggregated[cid]["feats_context_fid"] = (
+                metrics_aggregated[cid]["penalty_feats_context_fid"] = (
                     metrics["fit_exist_context_fid"] / penalty
+                )
+                metrics_aggregated[cid]["feats_context_fid"] = (
+                    metrics["fit_exist_context_fid"] / len_group
                 )
 
             self.t_cid = min(
                 metrics_aggregated,
-                key=lambda k: metrics_aggregated[k]["feats_context_fid"],
+                key=lambda k: metrics_aggregated[k]["penalty_feats_context_fid"],
             )
             fields = [server_round, self.t_cid]
             write_csv(fields, "teachers", self.save_dir)
 
             # Update overwrite_cids
             if server_round > 1 and self.t_cid != -1:
+                # Normalize feats_context_fid
+                feats_ctx_fid = [
+                    metrics_aggregated[k]["feats_context_fid"]
+                    for k in metrics_aggregated
+                ]
+                feats_ctx_fid = np.array(feats_ctx_fid)
+                mean = np.mean(feats_ctx_fid)
+                std = np.std(feats_ctx_fid)
+                norm_ctx_fid = (feats_ctx_fid - mean) / std
+                for i, k in enumerate(metrics_aggregated):
+                    metrics_aggregated[k]["norm_feats_context_fid"] = norm_ctx_fid[i]
+
+                # Overwrite bad students
                 self.overwrite_cids = []
                 for client, _ in results:
                     cid = int(client.cid)
-                    if cid != self.t_cid:
+                    if cid == self.t_cid:
+                        continue
+
+                    cid_norm = metrics_aggregated[cid]["norm_feats_context_fid"]
+                    t_cid_norm = metrics_aggregated[self.t_cid][
+                        "norm_feats_context_fid"
+                    ]
+                    diff_norm = abs(t_cid_norm - cid_norm)
+                    threshold = abs(t_cid_norm / (server_round * 0.5))
+                    if cid_norm > t_cid_norm and diff_norm > threshold:
                         parameters_aggregated[cid] = parameters_aggregated[self.t_cid]
                         self.overwrite_cids.append(cid)
+
                 fields = [server_round, self.overwrite_cids]
                 write_csv(fields, "overwrite_cids", self.save_dir)
 
