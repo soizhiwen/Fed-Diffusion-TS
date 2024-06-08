@@ -180,11 +180,12 @@ def plot_metrics(history, strategy, save_dir):
 
         for k, v in metrics.items():
             df = pd.DataFrame(v, columns=["Round", m_name[k]])
-            ax = sns.lineplot(data=df, x="Round", y=m_name[k], marker="o", seed=42)
+            df.to_csv(f"{save_dir}/{k}.csv", index=False)
+
+            ax = sns.lineplot(data=df, x="Round", y=m_name[k], marker="o")
             _ = ax.set_xticks(df["Round"].unique())
             _ = ax.set_xlabel("Round")
             _ = ax.set_ylabel(m_name[k])
-            df.to_csv(f"{save_dir}/{k}.csv", index=False)
             plt.savefig(f"{save_dir}/{k}.pdf", bbox_inches="tight")
             plt.clf()
 
@@ -207,25 +208,28 @@ def plot_metrics(history, strategy, save_dir):
         for k, v in metrics.items():
             df = pd.DataFrame(v, columns=["Round", m_name[k], "Cluster ID"])
             df.sort_values(by=["Cluster ID", "Round"], inplace=True)
+            df.to_csv(f"{save_dir}/{k}.csv", index=False)
+
+            df["Cluster ID"] = df["Cluster ID"].astype(str)
             ax = sns.lineplot(
-                data=df, x="Round", y=m_name[k], hue="Cluster ID", marker="o", seed=42
+                data=df, x="Round", y=m_name[k], hue="Cluster ID", marker="o"
             )
             sns.move_legend(ax, "upper left", bbox_to_anchor=(1, 1))
             _ = ax.set_xticks(df["Round"].unique())
             _ = ax.set_xlabel("Round")
             _ = ax.set_ylabel(m_name[k])
-            df.to_csv(f"{save_dir}/{k}.csv", index=False)
             plt.savefig(f"{save_dir}/{k}.pdf", bbox_inches="tight")
             plt.clf()
 
             # Compute global average
             df.drop(columns=["Cluster ID"], inplace=True)
             df = df.groupby(["Round"], as_index=False).mean()
-            ax = sns.lineplot(data=df, x="Round", y=m_name[k], marker="o", seed=42)
+            df.to_csv(f"{save_dir}/avg_{k}.csv", index=False)
+
+            ax = sns.lineplot(data=df, x="Round", y=m_name[k], marker="o")
             _ = ax.set_xticks(df["Round"].unique())
             _ = ax.set_xlabel("Round")
             _ = ax.set_ylabel(m_name[k])
-            df.to_csv(f"{save_dir}/avg_{k}.csv", index=False)
             plt.savefig(f"{save_dir}/avg_{k}.pdf", bbox_inches="tight")
             plt.clf()
 
@@ -238,14 +242,13 @@ def plot_metrics(history, strategy, save_dir):
         df = pd.read_csv(f"{save_dir}/{csv}.csv", header=None)
         df.columns = ["Round", m_name[k], "Client ID"]
         df.sort_values(by=["Client ID", "Round"], inplace=True)
-        ax = sns.lineplot(
-            data=df, x="Round", y=m_name[k], hue="Client ID", marker="o", seed=42
-        )
+        df.to_csv(f"{save_dir}/{csv}.csv", index=False)
+
+        ax = sns.lineplot(data=df, x="Round", y=m_name[k], hue="Client ID", marker="o")
         sns.move_legend(ax, "upper left", bbox_to_anchor=(1, 1))
         _ = ax.set_xticks(df["Round"].unique())
         _ = ax.set_xlabel("Round")
         _ = ax.set_ylabel(m_name[k])
-        df.to_csv(f"{save_dir}/{csv}.csv", index=False)
         plt.savefig(f"{save_dir}/{csv}.pdf", bbox_inches="tight")
         plt.clf()
 
