@@ -111,8 +111,7 @@ class FedTSM(FedAvg):
             if self.t_cid != -1:
                 params = parameters_to_ndarrays(parameters[client_id])
                 t_params = parameters_to_ndarrays(parameters[self.t_cid])
-                t_exclude_feats = self.features_groups[self.t_cid]
-                concat = list(params) + list(t_params) + [t_exclude_feats]
+                concat = list(params) + list(t_params)
                 parameters[client_id] = ndarrays_to_parameters(concat)
 
             fit_ins = FitIns(parameters[client_id], config)

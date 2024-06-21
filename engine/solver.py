@@ -48,7 +48,6 @@ class Trainer(object):
         self.ema = EMA(self.model, beta=ema_decay, update_every=ema_update_every).to(self.device)
 
         if self.t_model is not None:
-            self.t_model.exclude_feats = args.exclude_feats
             self.t_opt = Adam(filter(lambda p: p.requires_grad, self.t_model.parameters()), lr=start_lr, betas=[0.9, 0.96])
             self.t_ema = EMA(self.t_model, beta=ema_decay, update_every=ema_update_every).to(self.device)
 
